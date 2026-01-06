@@ -1,12 +1,12 @@
 {
     "name": "Buku Pengurusan SK Sri Aman 2026",
-    "short_name": "Buku Pengurusan",
+    "short_name": "SKSA 2026",
     "description": "Buku Pengurusan Digital SK Sri Aman 2026",
     "start_url": "./index.html",
     "display": "standalone",
-    "background_color": "#6366f1",
-    "theme_color": "#6366f1",
-    "orientation": "portrait",
+    "background_color": "#4f46e5",
+    "theme_color": "#4f46e5",
+    "orientation": "portrait-primary",
     "icons": [
         {
             "src": "icon-192.svg",
@@ -20,7 +20,5 @@
             "type": "image/svg+xml",
             "purpose": "any maskable"
         }
-    ],
-    "categories": ["education", "productivity"],
-    "lang": "ms"
+    ]
 }
