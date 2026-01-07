@@ -1,0 +1,1573 @@
+<!DOCTYPE html>
+<html lang="ms">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5.0, user-scalable=yes">
+    <title>Buku Pengurusan Digital - SK Sri Aman 2026</title>
+    
+    <!-- PWA Meta Tags -->
+    <meta name="theme-color" content="#4f46e5">
+    <meta name="description" content="Buku Pengurusan Digital SK Sri Aman 2026">
+    <link rel="manifest" href="manifest.json">
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="Buku SKSA">
+    
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+    <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        * { font-family: 'Plus Jakarta Sans', sans-serif; margin: 0; padding: 0; box-sizing: border-box; }
+        html, body, #root { height: 100%; overflow: hidden; }
+        .pdf-scroll-container::-webkit-scrollbar { width: 6px; }
+        .pdf-scroll-container::-webkit-scrollbar-track { background: #e2e8f0; }
+        .pdf-scroll-container::-webkit-scrollbar-thumb { background: #6366f1; border-radius: 4px; }
+        @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+        @keyframes slideUp { from { opacity: 0; transform: translateY(20px); } to { opacity: 1; transform: translateY(0); } }
+        @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.6; } }
+        .animate-fadeIn { animation: fadeIn 0.3s ease-out; }
+        .animate-slideUp { animation: slideUp 0.3s ease-out; }
+        .animate-pulse { animation: pulse 1.5s infinite; }
+        .page-wrapper { margin-bottom: 12px; }
+        canvas { image-rendering: -webkit-optimize-contrast; }
+    </style>
+</head>
+<body class="bg-slate-200">
+    <div id="root"></div>
+
+    <script type="text/babel">
+        const { useState, useRef, useEffect, useCallback, useMemo } = React;
+        pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+
+        // ============================================================================
+        // KONFIGURASI SK SRI AMAN 2026
+        // ============================================================================
+        
+        const CONFIG = {
+            namaSekolah: "SK Sri Aman",
+            namaSekolahPendek: "SKSA",
+            tahun: "2026",
+            pdfFileName: "BUKU_PENGURUSAN_SK_SRI_AMAN.pdf",
+            jumlahMukaSurat: 71,
+            logoEmoji: "🏫"
+        };
+
+        // ISI KANDUNGAN BUKU - 7 bahagian utama sahaja
+        const tableOfContents = [
+            { id: "jadual", label: "Jadual Guru Bertugas Mingguan", page_start: 12, page_end: 19, icon: "📅", color: "#6366f1" },
+            { id: "takwim", label: "Takwim", page_start: 20, page_end: 25, icon: "🗓️", color: "#8b5cf6" },
+            { id: "guru_kelas", label: "Senarai Guru Kelas", page_start: 49, page_end: 49, icon: "👥", color: "#0ea5e9" },
+            { id: "pentadbiran", label: "Pengurusan Pentadbiran", page_start: 26, page_end: 34, icon: "🏛️", color: "#ef4444" },
+            { id: "kurikulum", label: "Pengurusan Kurikulum", page_start: 35, page_end: 49, icon: "📚", color: "#10b981" },
+            { id: "hem", label: "Pengurusan HEM", page_start: 50, page_end: 57, icon: "🎓", color: "#f97316" },
+            { id: "kokurikulum", label: "Pengurusan Kokurikulum", page_start: 58, page_end: 71, icon: "⚽", color: "#ec4899" }
+        ];
+
+        // DATABASE GURU SK SRI AMAN 2026
+        const guruDatabase = [
+            { 
+                nama: "EN. MAHATHIR BIN MD SAHAK", 
+                jawatan: "Guru Besar", 
+                avatar: "👨‍💼", 
+                tugas: [
+                    { label: "Guru Besar", page_number: 9, category: "pentadbiran" },
+                    { label: "Pengerusi JK Pengurusan", page_number: 27, category: "pentadbiran" },
+                    { label: "Pengerusi JK Kurikulum", page_number: 36, category: "kurikulum" },
+                    { label: "Pengerusi JK HEM", page_number: 51, category: "hem" },
+                    { label: "Pengerusi JK Kokurikulum", page_number: 59, category: "kokurikulum" },
+                    { label: "JK PBPPP/Prestasi", page_number: 31, category: "pentadbiran" },
+                    { label: "JK Tatatertib", page_number: 34, category: "pentadbiran" }
+                ]
+            },
+            { 
+                nama: "EN. MUHAIZAM BIN MD MOKHTAR", 
+                jawatan: "PK Pentadbiran", 
+                avatar: "👨‍💼", 
+                tugas: [
+                    { label: "Penolong Kanan Pentadbiran", page_number: 9, category: "pentadbiran" },
+                    { label: "Timbalan Pengerusi Pentadbiran", page_number: 28, category: "pentadbiran" },
+                    { label: "JK JPMS/Data", page_number: 30, category: "pentadbiran" },
+                    { label: "JK Sumber Manusia/LDP", page_number: 30, category: "pentadbiran" },
+                    { label: "Naib Pengerusi Kurikulum", page_number: 36, category: "kurikulum" },
+                    { label: "Naib Pengerusi Kokurikulum", page_number: 60, category: "kokurikulum" }
+                ]
+            },
+            { 
+                nama: "PN. SHARIMAH BINTI MD ZIN", 
+                jawatan: "PK HEM", 
+                avatar: "👩‍💼", 
+                tugas: [
+                    { label: "Penolong Kanan HEM", page_number: 9, category: "hem" },
+                    { label: "Naib Pengerusi Pentadbiran", page_number: 28, category: "pentadbiran" },
+                    { label: "JK Keceriaan Fizikal", page_number: 32, category: "pentadbiran" },
+                    { label: "Timbalan Pengerusi HEM", page_number: 51, category: "hem" },
+                    { label: "Naib Pengerusi Kokurikulum", page_number: 60, category: "kokurikulum" }
+                ]
+            },
+            { 
+                nama: "EN. SANGARA NANDA A/L KARRUPPIAH", 
+                jawatan: "PK Kokurikulum", 
+                avatar: "👨‍💼", 
+                tugas: [
+                    { label: "Penolong Kanan Kokurikulum", page_number: 9, category: "kokurikulum" },
+                    { label: "Naib Pengerusi Pentadbiran", page_number: 28, category: "pentadbiran" },
+                    { label: "Timbalan Pengerusi Kokurikulum", page_number: 59, category: "kokurikulum" },
+                    { label: "JK JPMS/Data", page_number: 30, category: "pentadbiran" }
+                ]
+            },
+            { 
+                nama: "EN. AFFIQ NAQIUDDIN BIN ALIAS", 
+                jawatan: "Guru B. Melayu", 
+                avatar: "👨‍🏫", 
+                tugas: [
+                    { label: "Guru B. Melayu", page_number: 9, category: "kurikulum" },
+                    { label: "Setiausaha Sukan", page_number: 59, category: "kokurikulum" },
+                    { label: "Setiausaha E-RPH", page_number: 39, category: "kurikulum" },
+                    { label: "JK Olahraga", page_number: 64, category: "kokurikulum" },
+                    { label: "Jurulatih Olahraga", page_number: 66, category: "kokurikulum" },
+                    { label: "Merentas Desa", page_number: 66, category: "kokurikulum" },
+                    { label: "JK Disiplin", page_number: 53, category: "hem" }
+                ]
+            },
+            { 
+                nama: "PN. AFIEYFAH BINTI MOHD ALIM", 
+                jawatan: "Guru P. Islam", 
+                avatar: "👩‍🏫", 
+                tugas: [
+                    { label: "Guru P. Islam", page_number: 9, category: "kurikulum" },
+                    { label: "JK j-QAF", page_number: 36, category: "kurikulum" },
+                    { label: "Guru Kelas 5 Bestari", page_number: 49, category: "kurikulum" },
+                    { label: "JK Pengawas & Disiplin", page_number: 53, category: "hem" },
+                    { label: "Puteri Islam", page_number: 62, category: "kokurikulum" },
+                    { label: "Persatuan Agama Islam", page_number: 63, category: "kokurikulum" },
+                    { label: "JK Badminton", page_number: 64, category: "kokurikulum" },
+                    { label: "Rumah Kuning", page_number: 65, category: "kokurikulum" }
+                ]
+            },
+            { 
+                nama: "PN. AINA AMIRAH BINTI HALIM", 
+                jawatan: "Guru P. Islam", 
+                avatar: "👩‍🏫", 
+                tugas: [
+                    { label: "Guru P. Islam", page_number: 9, category: "kurikulum" },
+                    { label: "Penolong Guru Kelas 4 Cemerlang", page_number: 49, category: "kurikulum" },
+                    { label: "Kelab Doktor Muda", page_number: 61, category: "kokurikulum" },
+                    { label: "Puteri Islam", page_number: 62, category: "kokurikulum" },
+                    { label: "JK Bantuan & Kebajikan", page_number: 54, category: "hem" },
+                    { label: "JK Catur", page_number: 64, category: "kokurikulum" },
+                    { label: "Rumah Kuning", page_number: 65, category: "kokurikulum" }
+                ]
+            },
+            { 
+                nama: "EN. AMIRUL ARIFF BIN YUSOF", 
+                jawatan: "Guru Sains", 
+                avatar: "👨‍🏫", 
+                tugas: [
+                    { label: "Guru Sains", page_number: 9, category: "kurikulum" },
+                    { label: "Ketua Panitia Sains", page_number: 40, category: "kurikulum" },
+                    { label: "JK ICT", page_number: 32, category: "pentadbiran" },
+                    { label: "JK Bilik Makmal Sains", page_number: 33, category: "pentadbiran" },
+                    { label: "Guru Kelas 3 Bestari", page_number: 49, category: "kurikulum" },
+                    { label: "Pengakap", page_number: 61, category: "kokurikulum" },
+                    { label: "JK Bola Baling", page_number: 64, category: "kokurikulum" },
+                    { label: "Rumah Kuning", page_number: 65, category: "kokurikulum" },
+                    { label: "JK SPBT", page_number: 53, category: "hem" }
+                ]
+            },
+            { 
+                nama: "EN. ASQALANI BIN SUHAIMI", 
+                jawatan: "Guru Pemulihan", 
+                avatar: "👨‍🏫", 
+                tugas: [
+                    { label: "Guru Pemulihan", page_number: 9, category: "kurikulum" },
+                    { label: "Pemulihan Khas", page_number: 36, category: "kurikulum" },
+                    { label: "JK Pembangunan & Penyelenggaraan", page_number: 28, category: "pentadbiran" },
+                    { label: "Pemeriksa Aset JKPAK", page_number: 30, category: "pentadbiran" },
+                    { label: "JK Bilik Pemulihan", page_number: 33, category: "pentadbiran" },
+                    { label: "Penyelaras Unit Beruniform", page_number: 60, category: "kokurikulum" },
+                    { label: "JK Bola Sepak", page_number: 64, category: "kokurikulum" },
+                    { label: "Rumah Merah", page_number: 65, category: "kokurikulum" },
+                    { label: "JK 3K/Bencana", page_number: 55, category: "hem" },
+                    { label: "Pengurus Ragbi", page_number: 66, category: "kokurikulum" }
+                ]
+            },
+            { 
+                nama: "CIK CHIN YAN NING", 
+                jawatan: "Guru Sains", 
+                avatar: "👩‍🏫", 
+                tugas: [
+                    { label: "Guru Sains", page_number: 9, category: "kurikulum" },
+                    { label: "JK Peperiksaan", page_number: 28, category: "pentadbiran" },
+                    { label: "Setiausaha Penilaian & Peperiksaan", page_number: 37, category: "kurikulum" },
+                    { label: "Setiausaha Jadual Waktu", page_number: 37, category: "kurikulum" },
+                    { label: "JK Bilik Pentaksiran", page_number: 33, category: "pentadbiran" },
+                    { label: "Guru Kelas 6 Cemerlang", page_number: 49, category: "kurikulum" },
+                    { label: "Setiausaha Panitia B. Cina", page_number: 48, category: "kurikulum" },
+                    { label: "Kelab Doktor Muda", page_number: 63, category: "kokurikulum" },
+                    { label: "JK Olahraga", page_number: 64, category: "kokurikulum" },
+                    { label: "Ketua Rumah Kuning", page_number: 65, category: "kokurikulum" },
+                    { label: "JK Disiplin", page_number: 53, category: "hem" }
+                ]
+            },
+            { 
+                nama: "PN. HAMDINA NURARIFAH BINTI AHMAD @ ZAMRI", 
+                jawatan: "Guru Prasekolah", 
+                avatar: "👩‍🏫", 
+                tugas: [
+                    { label: "Guru Prasekolah", page_number: 9, category: "kurikulum" },
+                    { label: "Setiausaha Prasekolah", page_number: 43, category: "kurikulum" },
+                    { label: "Guru Kelas Pra Al-Iman", page_number: 49, category: "kurikulum" },
+                    { label: "Persatuan Bahasa", page_number: 61, category: "kokurikulum" },
+                    { label: "JK Bola Sepak", page_number: 64, category: "kokurikulum" },
+                    { label: "Rumah Sukan Prasekolah", page_number: 65, category: "kokurikulum" }
+                ]
+            },
+            { 
+                nama: "PN. MAGALETCHUMI A/P VEERAPPEN", 
+                jawatan: "Guru B. Tamil", 
+                avatar: "👩‍🏫", 
+                tugas: [
+                    { label: "Guru B. Tamil", page_number: 9, category: "kurikulum" },
+                    { label: "JK PBS/PBD", page_number: 28, category: "pentadbiran" },
+                    { label: "Setiausaha PBS/PBD", page_number: 38, category: "kurikulum" },
+                    { label: "Naib Setiausaha Peperiksaan", page_number: 37, category: "kurikulum" },
+                    { label: "Setiausaha Panitia P. Moral", page_number: 48, category: "kurikulum" },
+                    { label: "Pengerusi BKGS", page_number: 32, category: "pentadbiran" },
+                    { label: "Guru Kelas 3 Cemerlang", page_number: 49, category: "kurikulum" },
+                    { label: "JK Disiplin", page_number: 53, category: "hem" },
+                    { label: "Pengakap", page_number: 62, category: "kokurikulum" },
+                    { label: "Kelab Kitar Semula", page_number: 63, category: "kokurikulum" },
+                    { label: "JK Catur", page_number: 64, category: "kokurikulum" },
+                    { label: "Rumah Hijau", page_number: 65, category: "kokurikulum" }
+                ]
+            },
+            { 
+                nama: "EN. MOHAMAD SOLEHULHAFIZ BIN MOHD SUHAIMI", 
+                jawatan: "Guru Sejarah", 
+                avatar: "👨‍🏫", 
+                tugas: [
+                    { label: "Guru Sejarah", page_number: 9, category: "kurikulum" },
+                    { label: "Ketua Panitia PJK", page_number: 42, category: "kurikulum" },
+                    { label: "JK Stor PJK", page_number: 33, category: "pentadbiran" },
+                    { label: "Pelupusan JKPAK", page_number: 30, category: "pentadbiran" },
+                    { label: "Guru Kelas 2 Cemerlang", page_number: 49, category: "kurikulum" },
+                    { label: "Penyelaras 1M1S", page_number: 60, category: "kokurikulum" },
+                    { label: "Penolong Setiausaha Sukan", page_number: 60, category: "kokurikulum" },
+                    { label: "Pasukan Sekolah", page_number: 59, category: "kokurikulum" },
+                    { label: "JK 3K/Bencana", page_number: 55, category: "hem" },
+                    { label: "Tunas Kadet Remaja", page_number: 62, category: "kokurikulum" },
+                    { label: "Jurulatih Bola Sepak", page_number: 66, category: "kokurikulum" },
+                    { label: "Jurulatih Sepak Takraw", page_number: 66, category: "kokurikulum" }
+                ]
+            },
+            { 
+                nama: "EN. MUHAMMAD AMMAR BIN MUSTAFFA", 
+                jawatan: "Guru", 
+                avatar: "👨‍🏫", 
+                tugas: [
+                    { label: "Pemeriksa Aset JKPAK", page_number: 30, category: "pentadbiran" },
+                    { label: "Guru Kelas 5 Gemilang", page_number: 49, category: "kurikulum" },
+                    { label: "JK 3K/Bencana", page_number: 55, category: "hem" },
+                    { label: "Kelab Kitar Semula", page_number: 61, category: "kokurikulum" },
+                    { label: "JK Badminton", page_number: 64, category: "kokurikulum" },
+                    { label: "Rumah Merah", page_number: 65, category: "kokurikulum" },
+                    { label: "Pengurus Sepak Takraw", page_number: 66, category: "kokurikulum" }
+                ]
+            },
+            { 
+                nama: "EN. MUHAMMAD IHSAN BIN SHAIK ALI", 
+                jawatan: "Guru P. Seni", 
+                avatar: "👨‍🏫", 
+                tugas: [
+                    { label: "Guru P. Seni", page_number: 9, category: "kurikulum" },
+                    { label: "Ketua Panitia RBT", page_number: 42, category: "kurikulum" },
+                    { label: "JK Bilik RBT", page_number: 33, category: "pentadbiran" },
+                    { label: "JK Multimedia & Dashboard", page_number: 29, category: "pentadbiran" },
+                    { label: "JK Dewan Aman", page_number: 33, category: "pentadbiran" },
+                    { label: "Guru Kelas 3 Bestari", page_number: 49, category: "kurikulum" },
+                    { label: "Bola Sepak", page_number: 61, category: "kokurikulum" },
+                    { label: "Pengakap", page_number: 62, category: "kokurikulum" },
+                    { label: "Pengurus Bola Sepak", page_number: 66, category: "kokurikulum" },
+                    { label: "JK KPJ", page_number: 55, category: "hem" },
+                    { label: "Rumah Hijau", page_number: 65, category: "kokurikulum" }
+                ]
+            },
+            { 
+                nama: "EN. MUHAMMAD SUFIAN BIN MUSTAFA BAKRI", 
+                jawatan: "Guru Matematik", 
+                avatar: "👨‍🏫", 
+                tugas: [
+                    { label: "Guru Matematik", page_number: 9, category: "kurikulum" },
+                    { label: "JK SKPMg2", page_number: 28, category: "pentadbiran" },
+                    { label: "Penyelaras SKPMg2", page_number: 31, category: "pentadbiran" },
+                    { label: "JK ICT Sekolah", page_number: 32, category: "pentadbiran" },
+                    { label: "JK Bilik Makmal Komputer", page_number: 33, category: "pentadbiran" },
+                    { label: "JK JPMS/Data", page_number: 30, category: "pentadbiran" },
+                    { label: "Setiausaha ICT Kurikulum", page_number: 38, category: "kurikulum" },
+                    { label: "Setiausaha Panitia Matematik", page_number: 48, category: "kurikulum" },
+                    { label: "Setiausaha Panitia RBT", page_number: 48, category: "kurikulum" },
+                    { label: "Penolong Guru Kelas 4 Gemilang", page_number: 49, category: "kurikulum" },
+                    { label: "JK MOEIS", page_number: 54, category: "hem" },
+                    { label: "STEM & Robotik", page_number: 61, category: "kokurikulum" },
+                    { label: "Tunas Kadet Remaja", page_number: 61, category: "kokurikulum" },
+                    { label: "JK Catur", page_number: 64, category: "kokurikulum" },
+                    { label: "Jurulatih Catur", page_number: 66, category: "kokurikulum" },
+                    { label: "Jurulatih Bola Baling", page_number: 66, category: "kokurikulum" },
+                    { label: "Rumah Biru", page_number: 65, category: "kokurikulum" }
+                ]
+            },
+            { 
+                nama: "EN. MUHAMMAD YASIN BIN ABDUL AZIZ", 
+                jawatan: "Guru Muzik", 
+                avatar: "👨‍🏫", 
+                tugas: [
+                    { label: "Guru Muzik", page_number: 9, category: "kurikulum" },
+                    { label: "Naib Pengerusi BKGS", page_number: 32, category: "pentadbiran" },
+                    { label: "Setiausaha Panitia Muzik", page_number: 48, category: "kurikulum" },
+                    { label: "Guru Kelas 3 Gemilang", page_number: 49, category: "kurikulum" },
+                    { label: "JK KPJ", page_number: 52, category: "hem" },
+                    { label: "Pengakap", page_number: 62, category: "kokurikulum" },
+                    { label: "Kelab Muzik", page_number: 63, category: "kokurikulum" },
+                    { label: "JK Olahraga", page_number: 64, category: "kokurikulum" },
+                    { label: "Jurulatih Badminton", page_number: 66, category: "kokurikulum" },
+                    { label: "Jurulatih Merentas Desa", page_number: 66, category: "kokurikulum" },
+                    { label: "Rumah Kuning", page_number: 65, category: "kokurikulum" }
+                ]
+            },
+            { 
+                nama: "CIK NG SHI HUI", 
+                jawatan: "Guru P. B. Cina", 
+                avatar: "👩‍🏫", 
+                tugas: [
+                    { label: "Guru P. B. Cina", page_number: 9, category: "kurikulum" },
+                    { label: "Ketua Panitia B. Cina", page_number: 43, category: "kurikulum" },
+                    { label: "JK Bilik Bahasa Cina", page_number: 33, category: "pentadbiran" },
+                    { label: "Guru Kelas 2 Gemilang", page_number: 49, category: "kurikulum" },
+                    { label: "JK Bantuan & Kebajikan", page_number: 54, category: "hem" },
+                    { label: "Pandu Puteri Tunas", page_number: 61, category: "kokurikulum" },
+                    { label: "Kelab Muzik", page_number: 63, category: "kokurikulum" },
+                    { label: "JK Olahraga", page_number: 64, category: "kokurikulum" },
+                    { label: "Rumah Biru", page_number: 65, category: "kokurikulum" }
+                ]
+            },
+            { 
+                nama: "PN. NOOR HIDAYAH BINTI SALLEH", 
+                jawatan: "Guru P. Islam", 
+                avatar: "👩‍🏫", 
+                tugas: [
+                    { label: "Guru P. Islam", page_number: 9, category: "kurikulum" },
+                    { label: "Setiausaha Panitia P. Islam", page_number: 48, category: "kurikulum" },
+                    { label: "JK Sumber Manusia/LDP", page_number: 30, category: "pentadbiran" },
+                    { label: "Penolong Guru Kelas 1 Bestari", page_number: 49, category: "kurikulum" },
+                    { label: "JK Kantin", page_number: 53, category: "hem" },
+                    { label: "Persatuan Agama Islam", page_number: 61, category: "kokurikulum" },
+                    { label: "Puteri Islam", page_number: 62, category: "kokurikulum" },
+                    { label: "JK Bola Baling", page_number: 64, category: "kokurikulum" },
+                    { label: "Rumah Merah", page_number: 65, category: "kokurikulum" }
+                ]
+            },
+            { 
+                nama: "EN. NORLIZAM BIN IDROSE", 
+                jawatan: "Guru B. Melayu", 
+                avatar: "👨‍🏫", 
+                tugas: [
+                    { label: "Guru B. Melayu", page_number: 9, category: "kurikulum" },
+                    { label: "JK MBMMBI", page_number: 28, category: "pentadbiran" },
+                    { label: "Setiausaha MBMMBI", page_number: 38, category: "kurikulum" },
+                    { label: "JK PDCA/ICU", page_number: 33, category: "pentadbiran" },
+                    { label: "Bendahari BKGS", page_number: 32, category: "pentadbiran" },
+                    { label: "Setiausaha Panitia B. Melayu", page_number: 48, category: "kurikulum" },
+                    { label: "Guru Kelas 6 Bestari", page_number: 49, category: "kurikulum" },
+                    { label: "JK SPBT", page_number: 52, category: "hem" },
+                    { label: "Tunas Kadet Remaja", page_number: 62, category: "kokurikulum" },
+                    { label: "Kelab TVPSS/Buku", page_number: 63, category: "kokurikulum" },
+                    { label: "JK Olahraga", page_number: 64, category: "kokurikulum" },
+                    { label: "Rumah Merah", page_number: 65, category: "kokurikulum" }
+                ]
+            },
+            { 
+                nama: "CIK NURFATIN AFIQAH BINTI HAMZAH", 
+                jawatan: "Guru", 
+                avatar: "👩‍🏫", 
+                tugas: [
+                    { label: "JK Bilik Mesyuarat", page_number: 29, category: "pentadbiran" },
+                    { label: "JK Mesyuarat Guru", page_number: 29, category: "pentadbiran" },
+                    { label: "Setiausaha Panitia B. Arab", page_number: 48, category: "kurikulum" },
+                    { label: "Guru Kelas 5 Cemerlang", page_number: 49, category: "kurikulum" },
+                    { label: "JK Bantuan & Kebajikan (RMT)", page_number: 54, category: "hem" },
+                    { label: "Puteri Islam", page_number: 62, category: "kokurikulum" },
+                    { label: "JK Bola Baling", page_number: 64, category: "kokurikulum" },
+                    { label: "Rumah Hijau", page_number: 65, category: "kokurikulum" }
+                ]
+            },
+            { 
+                nama: "PN. NUR ELYIA BINTI MOHD ZIN", 
+                jawatan: "Guru B. Melayu", 
+                avatar: "👩‍🏫", 
+                tugas: [
+                    { label: "Guru B. Melayu", page_number: 9, category: "kurikulum" },
+                    { label: "Setiausaha Panitia Sejarah", page_number: 48, category: "kurikulum" },
+                    { label: "Penolong Guru Kelas 1 Cemerlang", page_number: 49, category: "kurikulum" },
+                    { label: "Setiausaha HEM", page_number: 51, category: "hem" },
+                    { label: "Bola Jaring", page_number: 61, category: "kokurikulum" },
+                    { label: "Tunas Kadet Remaja", page_number: 62, category: "kokurikulum" },
+                    { label: "Persatuan Bahasa", page_number: 63, category: "kokurikulum" },
+                    { label: "Pengurus Bola Baling (P)", page_number: 66, category: "kokurikulum" },
+                    { label: "Rumah Biru", page_number: 65, category: "kokurikulum" }
+                ]
+            },
+            { 
+                nama: "PN. NUR HAZIERAH BINTI AZMI", 
+                jawatan: "Guru Matematik", 
+                avatar: "👩‍🏫", 
+                tugas: [
+                    { label: "Guru Matematik", page_number: 9, category: "kurikulum" },
+                    { label: "Ketua Panitia Matematik", page_number: 40, category: "kurikulum" },
+                    { label: "JK Sumber Manusia/LDP", page_number: 30, category: "pentadbiran" },
+                    { label: "JK PBPPP/Prestasi", page_number: 31, category: "pentadbiran" },
+                    { label: "Setiausaha TS25", page_number: 34, category: "pentadbiran" },
+                    { label: "Penolong Guru Kelas 6 Bestari", page_number: 49, category: "kurikulum" },
+                    { label: "JK Pengawas & Disiplin", page_number: 53, category: "hem" },
+                    { label: "Tunas Kadet Remaja", page_number: 62, category: "kokurikulum" },
+                    { label: "Kelab Muzik", page_number: 63, category: "kokurikulum" },
+                    { label: "JK Bola Jaring", page_number: 64, category: "kokurikulum" },
+                    { label: "Ketua Rumah Hijau", page_number: 65, category: "kokurikulum" },
+                    { label: "Jurulatih Bola Jaring", page_number: 66, category: "kokurikulum" }
+                ]
+            },
+            { 
+                nama: "PN. NUR HIDAYAH BINTI ABDUL JALIL", 
+                jawatan: "Guru P. Islam", 
+                avatar: "👩‍🏫", 
+                tugas: [
+                    { label: "Guru P. Islam", page_number: 9, category: "kurikulum" },
+                    { label: "Ketua Panitia B. Arab", page_number: 41, category: "kurikulum" },
+                    { label: "JK BKGS", page_number: 32, category: "pentadbiran" },
+                    { label: "JK Surau", page_number: 33, category: "pentadbiran" },
+                    { label: "Penolong Guru Kelas 4 Bestari", page_number: 49, category: "kurikulum" },
+                    { label: "JK Bantuan & Kebajikan", page_number: 52, category: "hem" },
+                    { label: "Puteri Islam", page_number: 61, category: "kokurikulum" },
+                    { label: "Persatuan Agama Islam", page_number: 63, category: "kokurikulum" },
+                    { label: "JK Bola Jaring", page_number: 64, category: "kokurikulum" },
+                    { label: "Rumah Hijau", page_number: 65, category: "kokurikulum" }
+                ]
+            },
+            { 
+                nama: "CIK NUR IZZANY BINTI MOHD", 
+                jawatan: "Guru B. Melayu", 
+                avatar: "👩‍🏫", 
+                tugas: [
+                    { label: "Guru B. Melayu", page_number: 9, category: "kurikulum" },
+                    { label: "JK BKGS", page_number: 32, category: "pentadbiran" },
+                    { label: "Setiausaha Panitia PSV", page_number: 48, category: "kurikulum" },
+                    { label: "Guru Kelas 1 Bestari", page_number: 49, category: "kurikulum" },
+                    { label: "JK Bantuan & Kebajikan (BUDIMAS)", page_number: 54, category: "hem" },
+                    { label: "Kelab Doktor Muda", page_number: 63, category: "kokurikulum" },
+                    { label: "JK Bola Sepak", page_number: 64, category: "kokurikulum" },
+                    { label: "Rumah Hijau", page_number: 65, category: "kokurikulum" }
+                ]
+            },
+            { 
+                nama: "PN. NUR IZZATI BINTI MOHD KHALIL", 
+                jawatan: "Guru Kaunseling", 
+                avatar: "👩‍🏫", 
+                tugas: [
+                    { label: "Guru Kaunseling", page_number: 9, category: "hem" },
+                    { label: "JK Sumber Manusia/LDP", page_number: 29, category: "pentadbiran" },
+                    { label: "JK Bilik Kaunseling", page_number: 33, category: "pentadbiran" },
+                    { label: "Penolong Guru Kelas 3 Cemerlang", page_number: 49, category: "kurikulum" },
+                    { label: "Penolong Guru Kelas 5 Cemerlang", page_number: 49, category: "kurikulum" },
+                    { label: "JK Bimbingan & Kaunseling", page_number: 52, category: "hem" },
+                    { label: "JK Murid Cicir", page_number: 55, category: "hem" },
+                    { label: "Tunas Kadet Remaja", page_number: 62, category: "kokurikulum" },
+                    { label: "Kelab Kitar Semula", page_number: 63, category: "kokurikulum" },
+                    { label: "Catur", page_number: 61, category: "kokurikulum" },
+                    { label: "Pengurus Catur", page_number: 66, category: "kokurikulum" },
+                    { label: "Rumah Kuning", page_number: 65, category: "kokurikulum" },
+                    { label: "Rumah Biru", page_number: 65, category: "kokurikulum" }
+                ]
+            },
+            { 
+                nama: "PN. NUR IZZATI BINTI SAMSUDIN", 
+                jawatan: "Guru P. Islam", 
+                avatar: "👩‍🏫", 
+                tugas: [
+                    { label: "Guru P. Islam", page_number: 9, category: "kurikulum" },
+                    { label: "Setiausaha BKGS", page_number: 32, category: "pentadbiran" },
+                    { label: "JK Surau", page_number: 33, category: "pentadbiran" },
+                    { label: "Setiausaha Kurikulum", page_number: 36, category: "kurikulum" },
+                    { label: "Penolong Setiausaha E-RPH", page_number: 39, category: "kurikulum" },
+                    { label: "Guru Kelas 3 Gemilang", page_number: 49, category: "kurikulum" },
+                    { label: "JK PPDa", page_number: 54, category: "hem" },
+                    { label: "Puteri Islam", page_number: 62, category: "kokurikulum" },
+                    { label: "Kelab Doktor Muda", page_number: 63, category: "kokurikulum" },
+                    { label: "JK Bola Sepak", page_number: 64, category: "kokurikulum" },
+                    { label: "Ketua Rumah Merah", page_number: 65, category: "kokurikulum" }
+                ]
+            },
+            { 
+                nama: "PN. NUR SYAFIQAH BINTI NIZAMDIN", 
+                jawatan: "Guru B. Inggeris", 
+                avatar: "👩‍🏫", 
+                tugas: [
+                    { label: "Guru B. Inggeris", page_number: 9, category: "kurikulum" },
+                    { label: "JK JKPAK/Aset", page_number: 28, category: "pentadbiran" },
+                    { label: "Pegawai Aset JKPAK", page_number: 30, category: "pentadbiran" },
+                    { label: "JK PSS", page_number: 37, category: "kurikulum" },
+                    { label: "NILAM", page_number: 36, category: "kurikulum" },
+                    { label: "Guru Kelas 4 Gemilang", page_number: 49, category: "kurikulum" },
+                    { label: "JK SPBT", page_number: 53, category: "hem" },
+                    { label: "Kelab TVPSS/Buku", page_number: 61, category: "kokurikulum" },
+                    { label: "Pandu Puteri Tunas", page_number: 62, category: "kokurikulum" },
+                    { label: "JK Bola Baling", page_number: 64, category: "kokurikulum" },
+                    { label: "Rumah Biru", page_number: 65, category: "kokurikulum" }
+                ]
+            },
+            { 
+                nama: "PN. NUR ZUHAIRA BINTI MOHAMED SALIB", 
+                jawatan: "Guru B. Inggeris", 
+                avatar: "👩‍🏫", 
+                tugas: [
+                    { label: "Guru B. Inggeris", page_number: 9, category: "kurikulum" },
+                    { label: "Ketua Panitia PSV", page_number: 42, category: "kurikulum" },
+                    { label: "JK PLC", page_number: 36, category: "kurikulum" },
+                    { label: "JK Bilik PSV", page_number: 33, category: "pentadbiran" },
+                    { label: "Pen. Setiausaha Intervensi Tahun 1 (BI)", page_number: 39, category: "kurikulum" },
+                    { label: "Guru Kelas 1 Cemerlang", page_number: 49, category: "kurikulum" },
+                    { label: "JK Disiplin", page_number: 53, category: "hem" },
+                    { label: "Pengakap", page_number: 62, category: "kokurikulum" },
+                    { label: "JK Bola Jaring", page_number: 64, category: "kokurikulum" },
+                    { label: "Pengurus Bola Jaring", page_number: 66, category: "kokurikulum" },
+                    { label: "Rumah Merah", page_number: 65, category: "kokurikulum" }
+                ]
+            },
+            { 
+                nama: "PN. NUR ZURAINIE BINTI MOHD FAUZI", 
+                jawatan: "Guru B. Melayu", 
+                avatar: "👩‍🏫", 
+                tugas: [
+                    { label: "Guru B. Melayu", page_number: 9, category: "kurikulum" },
+                    { label: "Ketua Panitia B. Melayu", page_number: 40, category: "kurikulum" },
+                    { label: "JK Intervensi Tahun 1", page_number: 29, category: "pentadbiran" },
+                    { label: "Setiausaha Intervensi Tahun 1", page_number: 39, category: "kurikulum" },
+                    { label: "JK Bilik Digital Studio", page_number: 33, category: "pentadbiran" },
+                    { label: "JK ICT Kurikulum", page_number: 38, category: "kurikulum" },
+                    { label: "JK TS25", page_number: 34, category: "pentadbiran" },
+                    { label: "Penolong Guru Kelas 1 Gemilang", page_number: 49, category: "kurikulum" },
+                    { label: "JK 3K/Bencana", page_number: 55, category: "hem" },
+                    { label: "Penyelaras Kelab & Persatuan", page_number: 60, category: "kokurikulum" },
+                    { label: "Pandu Puteri Tunas", page_number: 62, category: "kokurikulum" },
+                    { label: "JK Catur", page_number: 64, category: "kokurikulum" },
+                    { label: "Rumah Hijau", page_number: 65, category: "kokurikulum" }
+                ]
+            },
+            { 
+                nama: "PN. PAMELA KHOO BEE LAY", 
+                jawatan: "Guru B. Inggeris", 
+                avatar: "👩‍🏫", 
+                tugas: [
+                    { label: "Guru B. Inggeris", page_number: 9, category: "kurikulum" },
+                    { label: "Ketua Panitia P. Moral", page_number: 41, category: "kurikulum" },
+                    { label: "Penolong Guru Kelas 2 Cemerlang", page_number: 49, category: "kurikulum" },
+                    { label: "JK KPJ", page_number: 55, category: "hem" },
+                    { label: "Kelab Muzik", page_number: 61, category: "kokurikulum" },
+                    { label: "Pandu Puteri Tunas", page_number: 62, category: "kokurikulum" },
+                    { label: "JK Badminton", page_number: 64, category: "kokurikulum" },
+                    { label: "Rumah Hijau", page_number: 65, category: "kokurikulum" }
+                ]
+            },
+            { 
+                nama: "PN. PUNITHA A/P MUNUSAMY", 
+                jawatan: "Guru Sains", 
+                avatar: "👩‍🏫", 
+                tugas: [
+                    { label: "Guru Sains", page_number: 9, category: "kurikulum" },
+                    { label: "JK Pusat Sumber Sekolah", page_number: 28, category: "pentadbiran" },
+                    { label: "Setiausaha PSS", page_number: 37, category: "kurikulum" },
+                    { label: "JK BKGS", page_number: 32, category: "pentadbiran" },
+                    { label: "Setiausaha Panitia Sains", page_number: 48, category: "kurikulum" },
+                    { label: "Penolong Guru Kelas 5 Gemilang", page_number: 49, category: "kurikulum" },
+                    { label: "JK Disiplin", page_number: 53, category: "hem" },
+                    { label: "Olahraga", page_number: 61, category: "kokurikulum" },
+                    { label: "Pandu Puteri Tunas", page_number: 62, category: "kokurikulum" },
+                    { label: "Kelab TVPSS/Buku", page_number: 63, category: "kokurikulum" },
+                    { label: "Pengurus Olahraga", page_number: 66, category: "kokurikulum" },
+                    { label: "Rumah Kuning", page_number: 65, category: "kokurikulum" }
+                ]
+            },
+            { 
+                nama: "PN. RADHIAH BINTI ZAINON", 
+                jawatan: "Guru P. Islam", 
+                avatar: "👩‍🏫", 
+                tugas: [
+                    { label: "Guru P. Islam", page_number: 9, category: "kurikulum" },
+                    { label: "Ketua Panitia P. Islam", page_number: 41, category: "kurikulum" },
+                    { label: "JK Bilik Gerakan", page_number: 33, category: "pentadbiran" },
+                    { label: "JK PBPPP/Prestasi", page_number: 31, category: "pentadbiran" },
+                    { label: "JK Jadual Waktu", page_number: 37, category: "kurikulum" },
+                    { label: "Penolong Guru Kelas 2 Gemilang", page_number: 49, category: "kurikulum" },
+                    { label: "Pengurusan Murid Cicir", page_number: 51, category: "hem" },
+                    { label: "Bola Baling", page_number: 61, category: "kokurikulum" },
+                    { label: "Puteri Islam", page_number: 62, category: "kokurikulum" },
+                    { label: "Persatuan Agama Islam", page_number: 63, category: "kokurikulum" },
+                    { label: "Pengurus Bola Baling (L)", page_number: 66, category: "kokurikulum" },
+                    { label: "Rumah Kuning", page_number: 65, category: "kokurikulum" }
+                ]
+            },
+            { 
+                nama: "DR. RENUKHA A/P NALLASAMY", 
+                jawatan: "Guru B. Inggeris", 
+                avatar: "👩‍🏫", 
+                tugas: [
+                    { label: "Guru B. Inggeris", page_number: 9, category: "kurikulum" },
+                    { label: "Ketua Panitia B. Inggeris", page_number: 40, category: "kurikulum" },
+                    { label: "JK HIP", page_number: 36, category: "kurikulum" },
+                    { label: "JK BKGS", page_number: 32, category: "pentadbiran" },
+                    { label: "Penyelaras TS25", page_number: 34, category: "pentadbiran" },
+                    { label: "Guru Kelas 4 Cemerlang", page_number: 49, category: "kurikulum" },
+                    { label: "JK Kantin", page_number: 53, category: "hem" },
+                    { label: "Badminton", page_number: 61, category: "kokurikulum" },
+                    { label: "Pandu Puteri Tunas", page_number: 62, category: "kokurikulum" },
+                    { label: "Persatuan Bahasa", page_number: 63, category: "kokurikulum" },
+                    { label: "Pengurus Badminton", page_number: 66, category: "kokurikulum" },
+                    { label: "Rumah Merah", page_number: 65, category: "kokurikulum" }
+                ]
+            },
+            { 
+                nama: "PN. SARIDAH BINTI TK MD YUSOFF", 
+                jawatan: "Guru Sejarah", 
+                avatar: "👩‍🏫", 
+                tugas: [
+                    { label: "Guru Sejarah", page_number: 9, category: "kurikulum" },
+                    { label: "Ketua Panitia Sejarah", page_number: 41, category: "kurikulum" },
+                    { label: "JK Bilik Guru", page_number: 33, category: "pentadbiran" },
+                    { label: "JK TS25", page_number: 34, category: "pentadbiran" },
+                    { label: "Guru Kelas 4 Bestari", page_number: 49, category: "kurikulum" },
+                    { label: "JK Kantin", page_number: 53, category: "hem" },
+                    { label: "Pandu Puteri Tunas", page_number: 62, category: "kokurikulum" },
+                    { label: "Persatuan Bahasa", page_number: 63, category: "kokurikulum" },
+                    { label: "JK Badminton", page_number: 64, category: "kokurikulum" },
+                    { label: "Rumah Biru", page_number: 65, category: "kokurikulum" }
+                ]
+            },
+            { 
+                nama: "EN. SHARWINTHIRAN A/L THAVARAJAH", 
+                jawatan: "Guru Prasekolah", 
+                avatar: "👨‍🏫", 
+                tugas: [
+                    { label: "Guru Prasekolah", page_number: 9, category: "kurikulum" },
+                    { label: "Penyelaras Prasekolah", page_number: 43, category: "kurikulum" },
+                    { label: "Guru Kelas Pra Az-Zahra", page_number: 49, category: "kurikulum" },
+                    { label: "Pengakap", page_number: 62, category: "kokurikulum" },
+                    { label: "Persatuan Bahasa", page_number: 63, category: "kokurikulum" },
+                    { label: "JK Olahraga", page_number: 64, category: "kokurikulum" },
+                    { label: "Rumah Sukan Prasekolah", page_number: 65, category: "kokurikulum" }
+                ]
+            },
+            { 
+                nama: "CIK THANALETCHIMI A/P R. RAMA", 
+                jawatan: "Guru B. Inggeris", 
+                avatar: "👩‍🏫", 
+                tugas: [
+                    { label: "Guru B. Inggeris", page_number: 9, category: "kurikulum" },
+                    { label: "JK TS25", page_number: 29, category: "pentadbiran" },
+                    { label: "Penyelaras TS25", page_number: 34, category: "pentadbiran" },
+                    { label: "Naib Setiausaha MBMMBI", page_number: 38, category: "kurikulum" },
+                    { label: "Setiausaha Program Peningkatan Akademik", page_number: 39, category: "kurikulum" },
+                    { label: "Setiausaha Panitia B. Inggeris", page_number: 48, category: "kurikulum" },
+                    { label: "Guru Kelas 6 Cemerlang", page_number: 49, category: "kurikulum" },
+                    { label: "JK PPDa", page_number: 54, category: "hem" },
+                    { label: "Setiausaha Kokurikulum", page_number: 59, category: "kokurikulum" },
+                    { label: "Data PAJSK", page_number: 60, category: "kokurikulum" },
+                    { label: "Persatuan Bahasa", page_number: 63, category: "kokurikulum" }
+                ]
+            },
+            { 
+                nama: "CIK VINEETA A/P SINGARAVELOO", 
+                jawatan: "Guru P. Muzik", 
+                avatar: "👩‍🏫", 
+                tugas: [
+                    { label: "Guru P. Muzik", page_number: 9, category: "kurikulum" },
+                    { label: "Ketua Panitia P. Muzik", page_number: 42, category: "kurikulum" },
+                    { label: "JK Bilik Muzik", page_number: 33, category: "pentadbiran" },
+                    { label: "JK TS25", page_number: 34, category: "pentadbiran" },
+                    { label: "Guru Kelas 2 Bestari", page_number: 49, category: "kurikulum" },
+                    { label: "JK PIBKS", page_number: 54, category: "hem" },
+                    { label: "Pengakap", page_number: 62, category: "kokurikulum" },
+                    { label: "Kelab Muzik", page_number: 63, category: "kokurikulum" },
+                    { label: "JK Bola Jaring", page_number: 64, category: "kokurikulum" },
+                    { label: "Ketua Rumah Biru", page_number: 65, category: "kokurikulum" }
+                ]
+            },
+            { 
+                nama: "EN. WAN AHMAD BIN WAN IBRAHIM", 
+                jawatan: "Guru", 
+                avatar: "👨‍🏫", 
+                tugas: [
+                    { label: "JK PSS", page_number: 37, category: "kurikulum" },
+                    { label: "Pelupusan JKPAK", page_number: 30, category: "pentadbiran" },
+                    { label: "Setiausaha Panitia PJK", page_number: 48, category: "kurikulum" },
+                    { label: "Guru Kelas 1 Gemilang", page_number: 49, category: "kurikulum" },
+                    { label: "JK PIBKS", page_number: 52, category: "hem" },
+                    { label: "STEM & Robotik", page_number: 61, category: "kokurikulum" },
+                    { label: "Pengakap", page_number: 62, category: "kokurikulum" },
+                    { label: "JK Bola Baling", page_number: 64, category: "kokurikulum" },
+                    { label: "Jurulatih Ragbi", page_number: 66, category: "kokurikulum" },
+                    { label: "Rumah Biru", page_number: 65, category: "kokurikulum" }
+                ]
+            }
+        ];
+
+        // TAKWIM SK SRI AMAN 2026
+        const takwimData = {
+            // JANUARI 2026
+            "2026-01-01": [{ event: "Cuti Akhir Sesi Persekolahan 2025/2026", type: "cuti", color: "#ef4444" }],
+            "2026-01-02": [{ event: "Cuti Akhir Sesi Persekolahan 2025/2026", type: "cuti", color: "#ef4444" }],
+            "2026-01-03": [{ event: "Cuti Akhir Sesi Persekolahan 2025/2026", type: "cuti", color: "#ef4444" }],
+            "2026-01-04": [{ event: "Cuti Akhir Sesi Persekolahan 2025/2026", type: "cuti", color: "#ef4444" }],
+            "2026-01-05": [{ event: "Cuti Akhir Sesi Persekolahan 2025/2026", type: "cuti", color: "#ef4444" }],
+            "2026-01-06": [{ event: "Cuti Akhir Sesi Persekolahan 2025/2026", type: "cuti", color: "#ef4444" }],
+            "2026-01-07": [{ event: "Cuti Akhir Sesi Persekolahan 2025/2026", type: "cuti", color: "#ef4444" }],
+            "2026-01-08": [{ event: "Hari Orientasi Prasekolah & Tahun 1", type: "sekolah", color: "#10b981" }, { event: "Mesyuarat 1 / LDP 1 (Bicara Aspirasi)", type: "sekolah", color: "#10b981" }],
+            "2026-01-09": [{ event: "Cuti Akhir Sesi Persekolahan 2025/2026", type: "cuti", color: "#ef4444" }],
+            "2026-01-10": [{ event: "Cuti Akhir Sesi Persekolahan 2025/2026", type: "cuti", color: "#ef4444" }],
+            "2026-01-12": [{ event: "Program Minggu Pertama / Program Transisi Tahun 1", type: "sekolah", color: "#10b981" }, { event: "Mesyuarat Panitia Bil.1", type: "sekolah", color: "#10b981" }, { event: "Program Jom Ke Sekolah", type: "aktiviti", color: "#8b5cf6" }],
+            "2026-01-16": [{ event: "Majlis Penyerahan BAP", type: "aktiviti", color: "#8b5cf6" }],
+            "2026-01-17": [{ event: "Israk & Mikraj", type: "cuti", color: "#ef4444" }],
+            "2026-01-19": [{ event: "Program Transisi Tahun 1 / Program Minggu 2", type: "sekolah", color: "#10b981" }],
+            "2026-01-20": [{ event: "Mesyuarat Kantin/3K Kali 1", type: "sekolah", color: "#10b981" }],
+            "2026-01-21": [{ event: "Mesyuarat SK@S Bil.1", type: "sekolah", color: "#10b981" }, { event: "Mesyuarat Kebajikan/SPBT/Disiplin Kali 1", type: "sekolah", color: "#10b981" }, { event: "1M1S/UB1", type: "kokurikulum", color: "#ec4899" }],
+            "2026-01-26": [{ event: "Program Transisi Tahun 1 / Program Minggu 3", type: "sekolah", color: "#10b981" }, { event: "Watikah Pelantikan Pengawas", type: "aktiviti", color: "#8b5cf6" }, { event: "Kursus Kepimpinan Pemimpin Muda", type: "aktiviti", color: "#8b5cf6" }],
+            "2026-01-27": [{ event: "Mesyuarat Pembangunan Sukan", type: "kokurikulum", color: "#ec4899" }],
+            "2026-01-28": [{ event: "1M1S/KP1", type: "kokurikulum", color: "#ec4899" }],
+            "2026-01-30": [{ event: "Dialog Permuafakatan Waris Tahun 6 Bil.1", type: "sekolah", color: "#10b981" }],
+            
+            // FEBRUARI 2026
+            "2026-02-02": [{ event: "Cuti Thaipusam", type: "cuti", color: "#ef4444" }],
+            "2026-02-03": [{ event: "Mesyuarat PBPPP Bil.1", type: "sekolah", color: "#10b981" }, { event: "Program Transisi Tahun 1 / Program Minggu 4", type: "sekolah", color: "#10b981" }],
+            "2026-02-04": [{ event: "1M1S/UB2", type: "kokurikulum", color: "#ec4899" }],
+            "2026-02-11": [{ event: "1M1S/KP2", type: "kokurikulum", color: "#ec4899" }],
+            "2026-02-13": [{ event: "Gotong-Royong 1", type: "aktiviti", color: "#8b5cf6" }],
+            "2026-02-16": [{ event: "Cuti Tambahan KPM", type: "cuti", color: "#ef4444" }],
+            "2026-02-17": [{ event: "Cuti Tahun Baru Cina", type: "cuti", color: "#ef4444" }],
+            "2026-02-18": [{ event: "Cuti Tahun Baru Cina", type: "cuti", color: "#ef4444" }],
+            "2026-02-19": [{ event: "Cuti Tambahan KPM", type: "cuti", color: "#ef4444" }],
+            "2026-02-23": [{ event: "Pelancaran Program Ihya' Ramadhan", type: "aktiviti", color: "#8b5cf6" }, { event: "Minggu Panitia PI & PM", type: "kurikulum", color: "#14b8a6" }, { event: "Program Mentor Mentee", type: "hem", color: "#f97316" }],
+            "2026-02-25": [{ event: "1M1S/UB3", type: "kokurikulum", color: "#ec4899" }],
+            
+            // MAC 2026
+            "2026-03-02": [{ event: "Pelancaran & Minggu Panitia BA & BC", type: "kurikulum", color: "#14b8a6" }, { event: "Pencerapan Kendiri / Semakan Buku Latihan 1", type: "kurikulum", color: "#14b8a6" }],
+            "2026-03-03": [{ event: "Mesyuarat Aset (JPAK) / Mesyuarat Kewangan (JPKAS) Bil.1", type: "sekolah", color: "#10b981" }],
+            "2026-03-04": [{ event: "1M1S/KP3", type: "kokurikulum", color: "#ec4899" }],
+            "2026-03-07": [{ event: "Nuzul Al-Quran", type: "cuti", color: "#ef4444" }],
+            "2026-03-09": [{ event: "Program Panitia PI & PM", type: "kurikulum", color: "#14b8a6" }],
+            "2026-03-11": [{ event: "1M1S/UB4", type: "kokurikulum", color: "#ec4899" }],
+            "2026-03-12": [{ event: "Mesyuarat Pengurusan & Mesyuarat Guru Bil.2", type: "sekolah", color: "#10b981" }, { event: "Mesyuarat Kurikulum Bil.2", type: "kurikulum", color: "#14b8a6" }, { event: "Program AntiBuli & Gangguan Seksual", type: "hem", color: "#f97316" }],
+            "2026-03-13": [{ event: "Program Panitia PI & PM", type: "kurikulum", color: "#14b8a6" }],
+            "2026-03-16": [{ event: "Program Panitia PI & PM", type: "kurikulum", color: "#14b8a6" }],
+            "2026-03-17": [{ event: "Spot Check 1", type: "hem", color: "#f97316" }],
+            "2026-03-18": [{ event: "1M1S/KP4", type: "kokurikulum", color: "#ec4899" }],
+            "2026-03-19": [{ event: "Cuti Tambahan KPM", type: "cuti", color: "#ef4444" }],
+            "2026-03-20": [{ event: "Cuti Hari Raya Aidilfitri", type: "cuti", color: "#ef4444" }],
+            "2026-03-21": [{ event: "Cuti Hari Raya Aidilfitri", type: "cuti", color: "#ef4444" }],
+            "2026-03-22": [{ event: "Cuti Hari Raya Aidilfitri", type: "cuti", color: "#ef4444" }],
+            "2026-03-23": [{ event: "Cuti Penggal 1", type: "cuti", color: "#f59e0b" }],
+            "2026-03-24": [{ event: "Cuti Penggal 1", type: "cuti", color: "#f59e0b" }],
+            "2026-03-25": [{ event: "Cuti Penggal 1", type: "cuti", color: "#f59e0b" }],
+            "2026-03-26": [{ event: "Cuti Penggal 1", type: "cuti", color: "#f59e0b" }],
+            "2026-03-27": [{ event: "Cuti Penggal 1", type: "cuti", color: "#f59e0b" }],
+            "2026-03-28": [{ event: "Cuti Penggal 1", type: "cuti", color: "#f59e0b" }],
+            "2026-03-29": [{ event: "Cuti Penggal 1", type: "cuti", color: "#f59e0b" }],
+            "2026-03-30": [{ event: "Program Mentor Mentee", type: "hem", color: "#f97316" }],
+            "2026-03-31": [{ event: "Mesyuarat Sukan", type: "kokurikulum", color: "#ec4899" }],
+            
+            // APRIL 2026
+            "2026-04-01": [{ event: "Latihan Rumah Sukan 1", type: "kokurikulum", color: "#ec4899" }],
+            "2026-04-02": [{ event: "Mesyuarat SK@S Bil.2", type: "sekolah", color: "#10b981" }],
+            "2026-04-03": [{ event: "Sambutan Hari Raya Aidilfitri Peringkat Sekolah", type: "aktiviti", color: "#8b5cf6" }],
+            "2026-04-06": [{ event: "Mesyuarat Panitia Bil.2", type: "kurikulum", color: "#14b8a6" }],
+            "2026-04-08": [{ event: "Latihan Rumah Sukan 2", type: "kokurikulum", color: "#ec4899" }],
+            "2026-04-09": [{ event: "Mesyuarat HEM Kali 2", type: "hem", color: "#f97316" }],
+            "2026-04-11": [{ event: "Mesyuarat Agung PIBG", type: "sekolah", color: "#10b981" }],
+            "2026-04-14": [{ event: "Ujian SEGAK 1 / BMI 5-9T 1", type: "kurikulum", color: "#14b8a6" }],
+            "2026-04-15": [{ event: "Latihan Rumah Sukan 3", type: "kokurikulum", color: "#ec4899" }],
+            "2026-04-20": [{ event: "Pelancaran & Minggu Panitia BM & BI", type: "kurikulum", color: "#14b8a6" }, { event: "Mesyuarat Kantin/3K 2", type: "hem", color: "#f97316" }],
+            "2026-04-21": [{ event: "Mesyuarat Kebajikan/SPBT/Disiplin 2", type: "hem", color: "#f97316" }],
+            "2026-04-22": [{ event: "Latihan Rumah Sukan 4", type: "kokurikulum", color: "#ec4899" }],
+            "2026-04-23": [{ event: "Mesyuarat PBPPP Bil.2", type: "sekolah", color: "#10b981" }],
+            "2026-04-24": [{ event: "Latihan Kebakaran Siri 1", type: "hem", color: "#f97316" }],
+            "2026-04-25": [{ event: "Kem Bestari Solat Tahap 1 / LDP 2 (PAJSK)", type: "aktiviti", color: "#8b5cf6" }],
+            "2026-04-27": [{ event: "Program Mentor Mentee", type: "hem", color: "#f97316" }],
+            "2026-04-29": [{ event: "Akhir Acara Padang 1", type: "kokurikulum", color: "#ec4899" }],
+            "2026-04-30": [{ event: "Akhir Acara Padang 2", type: "kokurikulum", color: "#ec4899" }],
+            
+            // MEI 2026
+            "2026-05-01": [{ event: "Cuti Hari Pekerja", type: "cuti", color: "#ef4444" }],
+            "2026-05-04": [{ event: "Raptai Perbarisan 1", type: "kokurikulum", color: "#ec4899" }],
+            "2026-05-05": [{ event: "Penataraan Psikometrik", type: "hem", color: "#f97316" }, { event: "Raptai Perbarisan 2", type: "kokurikulum", color: "#ec4899" }],
+            "2026-05-06": [{ event: "Pemeriksaan Buku Teks 1", type: "hem", color: "#f97316" }, { event: "Raptai Sukan", type: "kokurikulum", color: "#ec4899" }],
+            "2026-05-07": [{ event: "Raptai Penuh", type: "kokurikulum", color: "#ec4899" }],
+            "2026-05-09": [{ event: "Kejohanan Olahraga Tahunan SKSA", type: "kokurikulum", color: "#ec4899" }],
+            "2026-05-11": [{ event: "Cuti Peristiwa 1", type: "cuti", color: "#ef4444" }],
+            "2026-05-13": [{ event: "Ceramah Cakna Remaja Tahun 6", type: "hem", color: "#f97316" }, { event: "1M1S/KP", type: "kokurikulum", color: "#ec4899" }],
+            "2026-05-18": [{ event: "Sambutan Hari Guru Peringkat Sekolah", type: "aktiviti", color: "#8b5cf6" }],
+            "2026-05-20": [{ event: "UPSA & PBS 1", type: "peperiksaan", color: "#0ea5e9" }],
+            "2026-05-21": [{ event: "UPSA & PBS 1", type: "peperiksaan", color: "#0ea5e9" }],
+            "2026-05-22": [{ event: "UPSA & PBS 1", type: "peperiksaan", color: "#0ea5e9" }],
+            "2026-05-23": [{ event: "Cuti Pertengahan Tahun", type: "cuti", color: "#f59e0b" }],
+            "2026-05-24": [{ event: "Cuti Pertengahan Tahun", type: "cuti", color: "#f59e0b" }],
+            "2026-05-25": [{ event: "Cuti Pertengahan Tahun", type: "cuti", color: "#f59e0b" }],
+            "2026-05-26": [{ event: "Cuti Pertengahan Tahun", type: "cuti", color: "#f59e0b" }],
+            "2026-05-27": [{ event: "Cuti Hari Raya Aidiladha", type: "cuti", color: "#ef4444" }],
+            "2026-05-28": [{ event: "Cuti Hari Raya Aidiladha", type: "cuti", color: "#ef4444" }],
+            "2026-05-29": [{ event: "Cuti Pertengahan Tahun", type: "cuti", color: "#f59e0b" }],
+            "2026-05-30": [{ event: "Cuti Pertengahan Tahun", type: "cuti", color: "#f59e0b" }],
+            "2026-05-31": [{ event: "Cuti Pertengahan Tahun", type: "cuti", color: "#f59e0b" }],
+            
+            // JUN 2026
+            "2026-06-01": [{ event: "Cuti Pertengahan Tahun", type: "cuti", color: "#f59e0b" }],
+            "2026-06-02": [{ event: "Cuti Pertengahan Tahun", type: "cuti", color: "#f59e0b" }],
+            "2026-06-03": [{ event: "Cuti Pertengahan Tahun", type: "cuti", color: "#f59e0b" }],
+            "2026-06-04": [{ event: "Cuti Pertengahan Tahun", type: "cuti", color: "#f59e0b" }],
+            "2026-06-05": [{ event: "Cuti Pertengahan Tahun", type: "cuti", color: "#f59e0b" }],
+            "2026-06-06": [{ event: "Cuti Pertengahan Tahun", type: "cuti", color: "#f59e0b" }],
+            "2026-06-07": [{ event: "Cuti Pertengahan Tahun", type: "cuti", color: "#f59e0b" }],
+            "2026-06-08": [{ event: "Pencerapan PDP 2 / Semakan Buku Latihan 2", type: "kurikulum", color: "#14b8a6" }],
+            "2026-06-09": [{ event: "Mesyuarat Kokurikulum Bil 2 / Mesyuarat Perkhemahan 1", type: "kokurikulum", color: "#ec4899" }],
+            "2026-06-10": [{ event: "Program Gaya Hidup Sihat / Program Anti Buli", type: "hem", color: "#f97316" }, { event: "1M1S/UB 5", type: "kokurikulum", color: "#ec4899" }],
+            "2026-06-11": [{ event: "Mesyuarat Aset (JPAK) / Mesyuarat Kewangan (JPKAS) Bil.2", type: "sekolah", color: "#10b981" }],
+            "2026-06-16": [{ event: "SABICC", type: "kokurikulum", color: "#ec4899" }],
+            "2026-06-17": [{ event: "Awal Muharram", type: "cuti", color: "#ef4444" }],
+            "2026-06-18": [{ event: "Dialog Prestasi Bil.1", type: "sekolah", color: "#10b981" }],
+            "2026-06-22": [{ event: "Program Mentor Mentee", type: "hem", color: "#f97316" }],
+            "2026-06-24": [{ event: "1M1S/KP 5", type: "kokurikulum", color: "#ec4899" }],
+            "2026-06-26": [{ event: "Program Jayawaris 1 (Pelaporan PBD Pertengahan Tahun)", type: "kurikulum", color: "#14b8a6" }],
+            "2026-06-27": [{ event: "LDP 3 (SASUSI)", type: "sekolah", color: "#10b981" }],
+            
+            // JULAI 2026
+            "2026-07-01": [{ event: "1M1S/UB6", type: "kokurikulum", color: "#ec4899" }],
+            "2026-07-02": [{ event: "Mesyuarat Pengurusan & Mesyuarat Guru Bil.3", type: "sekolah", color: "#10b981" }, { event: "Mesyuarat Kurikulum Bil.3", type: "kurikulum", color: "#14b8a6" }],
+            "2026-07-06": [{ event: "Mesyuarat Panitia Bil.3", type: "kurikulum", color: "#14b8a6" }],
+            "2026-07-07": [{ event: "Cuti Hari Warisan", type: "cuti", color: "#ef4444" }],
+            "2026-07-08": [{ event: "Mesyuarat Panitia Bil.3", type: "kurikulum", color: "#14b8a6" }, { event: "1M1S/KP6", type: "kokurikulum", color: "#ec4899" }],
+            "2026-07-09": [{ event: "Mesyuarat Perkhemahan 2", type: "kokurikulum", color: "#ec4899" }],
+            "2026-07-11": [{ event: "Cuti Hari Kelahiran TYT", type: "cuti", color: "#ef4444" }],
+            "2026-07-15": [{ event: "Spot Check 2", type: "hem", color: "#f97316" }, { event: "1M1S/UB7", type: "kokurikulum", color: "#ec4899" }],
+            "2026-07-16": [{ event: "Mesyuarat HEM 3", type: "hem", color: "#f97316" }],
+            "2026-07-20": [{ event: "Mesyuarat Kantin/3K 3", type: "hem", color: "#f97316" }],
+            "2026-07-21": [{ event: "Mesyuarat Kebajikan/SPBT/Disiplin 3", type: "hem", color: "#f97316" }],
+            "2026-07-22": [{ event: "Kempen Ganyang AEDES", type: "hem", color: "#f97316" }, { event: "1M1S/KP7", type: "kokurikulum", color: "#ec4899" }],
+            "2026-07-24": [{ event: "Perkhemahan Perdana", type: "kokurikulum", color: "#ec4899" }],
+            "2026-07-25": [{ event: "Perkhemahan Perdana", type: "kokurikulum", color: "#ec4899" }],
+            "2026-07-27": [{ event: "Pelancaran & Minggu Panitia MT/SN/RBT", type: "kurikulum", color: "#14b8a6" }, { event: "Program Mentor Mentee", type: "hem", color: "#f97316" }],
+            "2026-07-29": [{ event: "1M1S/UB8", type: "kokurikulum", color: "#ec4899" }],
+            
+            // OGOS 2026
+            "2026-08-05": [{ event: "1M1S/KP8", type: "kokurikulum", color: "#ec4899" }],
+            "2026-08-06": [{ event: "Mesyuarat PBPPP Bil.3", type: "sekolah", color: "#10b981" }],
+            "2026-08-08": [{ event: "Kem Bestari Solat Tahap 2 / LDP 4 (Bacaan Buku)", type: "aktiviti", color: "#8b5cf6" }],
+            "2026-08-10": [{ event: "Program Anti Dadah", type: "hem", color: "#f97316" }],
+            "2026-08-11": [{ event: "Ujian SEGAK 2 / BMI 5-9T 2", type: "kurikulum", color: "#14b8a6" }, { event: "Mesyuarat Kokurikulum Bil 3", type: "kokurikulum", color: "#ec4899" }],
+            "2026-08-12": [{ event: "1M1S/UB9", type: "kokurikulum", color: "#ec4899" }],
+            "2026-08-17": [{ event: "Pelancaran Bulan Kebangsaan / Minggu Panitia Sejarah/PSV/MZ", type: "kurikulum", color: "#14b8a6" }],
+            "2026-08-18": [{ event: "Program Panitia Sejarah/PSV/MZ", type: "kurikulum", color: "#14b8a6" }, { event: "Rawatan D1 & D6", type: "hem", color: "#f97316" }],
+            "2026-08-19": [{ event: "Rawatan D1 & D6", type: "hem", color: "#f97316" }, { event: "1M1S/KP9", type: "kokurikulum", color: "#ec4899" }],
+            "2026-08-20": [{ event: "Mesyuarat SK@S Bil.3", type: "sekolah", color: "#10b981" }, { event: "Rawatan D1 & D6", type: "hem", color: "#f97316" }],
+            "2026-08-22": [{ event: "Gotong Royong Perdana / LDP 5 (Lawatan)", type: "aktiviti", color: "#8b5cf6" }],
+            "2026-08-24": [{ event: "Cuti Peristiwa 2", type: "cuti", color: "#ef4444" }],
+            "2026-08-25": [{ event: "Maulidur Rasul", type: "cuti", color: "#ef4444" }],
+            "2026-08-26": [{ event: "Program Panitia Sejarah/PSV/MZ", type: "kurikulum", color: "#14b8a6" }, { event: "1M1S/UB10", type: "kokurikulum", color: "#ec4899" }],
+            "2026-08-28": [{ event: "Sambutan Hari Merdeka", type: "aktiviti", color: "#8b5cf6" }],
+            "2026-08-29": [{ event: "Cuti Sekolah Penggal 2", type: "cuti", color: "#f59e0b" }],
+            "2026-08-30": [{ event: "Cuti Sekolah Penggal 2", type: "cuti", color: "#f59e0b" }],
+            "2026-08-31": [{ event: "Cuti Hari Merdeka", type: "cuti", color: "#ef4444" }],
+            
+            // SEPTEMBER 2026
+            "2026-09-01": [{ event: "Cuti Sekolah Penggal 2", type: "cuti", color: "#f59e0b" }],
+            "2026-09-02": [{ event: "Cuti Sekolah Penggal 2", type: "cuti", color: "#f59e0b" }],
+            "2026-09-03": [{ event: "Cuti Sekolah Penggal 2", type: "cuti", color: "#f59e0b" }],
+            "2026-09-04": [{ event: "Cuti Sekolah Penggal 2", type: "cuti", color: "#f59e0b" }],
+            "2026-09-05": [{ event: "Cuti Sekolah Penggal 2", type: "cuti", color: "#f59e0b" }],
+            "2026-09-06": [{ event: "Cuti Sekolah Penggal 2", type: "cuti", color: "#f59e0b" }],
+            "2026-09-07": [{ event: "Pencerapan PDP 3 / Semakan Buku Latihan 3", type: "kurikulum", color: "#14b8a6" }],
+            "2026-09-08": [{ event: "Mesyuarat Merentas Desa/SaSuSi/ Karnival", type: "kokurikulum", color: "#ec4899" }],
+            "2026-09-09": [{ event: "1M1S/KP10", type: "kokurikulum", color: "#ec4899" }],
+            "2026-09-10": [{ event: "Mesyuarat Aset (JPAK) / Mesyuarat Kewangan (JPKAS) Bil.3", type: "sekolah", color: "#10b981" }],
+            "2026-09-11": [{ event: "Latihan Kebakaran 2", type: "hem", color: "#f97316" }],
+            "2026-09-14": [{ event: "Penutup Bulan Kebangsaan", type: "kurikulum", color: "#14b8a6" }],
+            "2026-09-16": [{ event: "Cuti Hari Malaysia", type: "cuti", color: "#ef4444" }],
+            "2026-09-23": [{ event: "1M1S/UB11", type: "kokurikulum", color: "#ec4899" }],
+            "2026-09-25": [{ event: "Merentas Desa SKSA", type: "kokurikulum", color: "#ec4899" }],
+            "2026-09-30": [{ event: "Pemeriksaan Buku Teks 2", type: "hem", color: "#f97316" }, { event: "1M1S/KP11", type: "kokurikulum", color: "#ec4899" }],
+            
+            // OKTOBER 2026
+            "2026-10-01": [{ event: "Mesyuarat Merentas Desa 2/ Karnival 2", type: "kokurikulum", color: "#ec4899" }],
+            "2026-10-06": [{ event: "Semakan Data IDME", type: "hem", color: "#f97316" }],
+            "2026-10-07": [{ event: "1M1S/UB12", type: "kokurikulum", color: "#ec4899" }],
+            "2026-10-12": [{ event: "UASA & PBS 2", type: "peperiksaan", color: "#0ea5e9" }],
+            "2026-10-13": [{ event: "UASA & PBS 2", type: "peperiksaan", color: "#0ea5e9" }, { event: "Mesyuarat Kokurikulum Bil 4", type: "kokurikulum", color: "#ec4899" }],
+            "2026-10-14": [{ event: "UASA & PBS 2", type: "peperiksaan", color: "#0ea5e9" }, { event: "Bengkel Awal Remaja", type: "hem", color: "#f97316" }, { event: "1M1S/KP12", type: "kokurikulum", color: "#ec4899" }],
+            "2026-10-19": [{ event: "Mesyuarat HEM 4", type: "hem", color: "#f97316" }],
+            "2026-10-20": [{ event: "Mesyuarat Kantin/3K 4", type: "hem", color: "#f97316" }],
+            "2026-10-21": [{ event: "Mesyuarat Kebajikan/SPBT/Disiplin 4", type: "hem", color: "#f97316" }, { event: "1M1S/UB13", type: "kokurikulum", color: "#ec4899" }],
+            "2026-10-22": [{ event: "Mesyuarat PBPPP Bil.4", type: "sekolah", color: "#10b981" }, { event: "Mesyuarat Pembangunan Sukan 2", type: "kokurikulum", color: "#ec4899" }],
+            "2026-10-24": [{ event: "Karnival Keusahawanan Kokurikulum", type: "kokurikulum", color: "#ec4899" }],
+            "2026-10-26": [{ event: "Cuti Peristiwa 3", type: "cuti", color: "#ef4444" }],
+            "2026-10-28": [{ event: "Dialog Prestasi Bil.2", type: "sekolah", color: "#10b981" }, { event: "1M1S/KP13", type: "kokurikulum", color: "#ec4899" }],
+            "2026-10-29": [{ event: "Mesyuarat SK@S Bil.4", type: "sekolah", color: "#10b981" }],
+            "2026-10-30": [{ event: "Gotong-Royong 2", type: "aktiviti", color: "#8b5cf6" }],
+            
+            // NOVEMBER 2026
+            "2026-11-05": [{ event: "Mesyuarat HEM 4", type: "hem", color: "#f97316" }],
+            "2026-11-08": [{ event: "Cuti Deepavali", type: "cuti", color: "#ef4444" }],
+            "2026-11-10": [{ event: "Cuti Tambahan KPM", type: "cuti", color: "#ef4444" }],
+            "2026-11-11": [{ event: "Mesyuarat Pengurusan & Mesyuarat Guru Bil.4", type: "sekolah", color: "#10b981" }, { event: "Mesyuarat Budaya Tutup Sekolah", type: "sekolah", color: "#10b981" }, { event: "Mesyuarat Kurikulum Bil.4", type: "kurikulum", color: "#14b8a6" }],
+            "2026-11-12": [{ event: "Mesyuarat Aset (JPAK) / Mesyuarat Kewangan (JPKAS) Bil.4", type: "sekolah", color: "#10b981" }],
+            "2026-11-13": [{ event: "Hari Kanak-kanak & Jamuan Akhir Tahun", type: "aktiviti", color: "#8b5cf6" }],
+            "2026-11-16": [{ event: "Mesyuarat Panitia Bil.4", type: "kurikulum", color: "#14b8a6" }],
+            "2026-11-17": [{ event: "Proses Pemulangan dan Penerimaan Buku Teks", type: "hem", color: "#f97316" }],
+            "2026-11-18": [{ event: "Lawatan Tahun 6", type: "aktiviti", color: "#8b5cf6" }],
+            "2026-11-20": [{ event: "Program Jayawaris 2 (Pelaporan PBD Akhir Tahun)", type: "kurikulum", color: "#14b8a6" }],
+            "2026-11-23": [{ event: "Program Mentor Mentee", type: "hem", color: "#f97316" }],
+            "2026-11-28": [{ event: "Hari Anugerah Kecemerlangan (HAK)", type: "aktiviti", color: "#8b5cf6" }],
+            "2026-11-30": [{ event: "Cuti Peristiwa 4", type: "cuti", color: "#ef4444" }],
+            
+            // DISEMBER 2026
+            "2026-12-03": [{ event: "Proses Naik Kelas", type: "hem", color: "#f97316" }],
+            "2026-12-04": [{ event: "Program Lambaian Kasih Tahun 6", type: "aktiviti", color: "#8b5cf6" }],
+            "2026-12-05": [{ event: "Cuti Akhir Persekolahan Tahun 2026", type: "cuti", color: "#f59e0b" }],
+            "2026-12-06": [{ event: "Cuti Akhir Persekolahan Tahun 2026", type: "cuti", color: "#f59e0b" }],
+            "2026-12-07": [{ event: "Cuti Akhir Persekolahan Tahun 2026", type: "cuti", color: "#f59e0b" }],
+            "2026-12-08": [{ event: "Cuti Akhir Persekolahan Tahun 2026", type: "cuti", color: "#f59e0b" }],
+            "2026-12-09": [{ event: "Cuti Akhir Persekolahan Tahun 2026", type: "cuti", color: "#f59e0b" }],
+            "2026-12-10": [{ event: "Cuti Akhir Persekolahan Tahun 2026", type: "cuti", color: "#f59e0b" }],
+            "2026-12-11": [{ event: "Cuti Akhir Persekolahan Tahun 2026", type: "cuti", color: "#f59e0b" }],
+            "2026-12-12": [{ event: "Cuti Akhir Persekolahan Tahun 2026", type: "cuti", color: "#f59e0b" }],
+            "2026-12-13": [{ event: "Cuti Akhir Persekolahan Tahun 2026", type: "cuti", color: "#f59e0b" }],
+            "2026-12-14": [{ event: "Cuti Akhir Persekolahan Tahun 2026", type: "cuti", color: "#f59e0b" }],
+            "2026-12-15": [{ event: "Cuti Akhir Persekolahan Tahun 2026", type: "cuti", color: "#f59e0b" }],
+            "2026-12-16": [{ event: "Cuti Akhir Persekolahan Tahun 2026", type: "cuti", color: "#f59e0b" }],
+            "2026-12-17": [{ event: "Cuti Akhir Persekolahan Tahun 2026", type: "cuti", color: "#f59e0b" }],
+            "2026-12-18": [{ event: "Cuti Akhir Persekolahan Tahun 2026", type: "cuti", color: "#f59e0b" }],
+            "2026-12-19": [{ event: "Cuti Akhir Persekolahan Tahun 2026", type: "cuti", color: "#f59e0b" }],
+            "2026-12-20": [{ event: "Cuti Akhir Persekolahan Tahun 2026", type: "cuti", color: "#f59e0b" }],
+            "2026-12-21": [{ event: "Cuti Akhir Persekolahan Tahun 2026", type: "cuti", color: "#f59e0b" }],
+            "2026-12-22": [{ event: "Cuti Akhir Persekolahan Tahun 2026", type: "cuti", color: "#f59e0b" }],
+            "2026-12-23": [{ event: "Cuti Akhir Persekolahan Tahun 2026", type: "cuti", color: "#f59e0b" }],
+            "2026-12-24": [{ event: "Cuti Akhir Persekolahan Tahun 2026", type: "cuti", color: "#f59e0b" }],
+            "2026-12-25": [{ event: "Cuti Krismas", type: "cuti", color: "#ef4444" }],
+            "2026-12-26": [{ event: "Cuti Akhir Persekolahan Tahun 2026", type: "cuti", color: "#f59e0b" }],
+            "2026-12-27": [{ event: "Cuti Akhir Persekolahan Tahun 2026", type: "cuti", color: "#f59e0b" }],
+            "2026-12-28": [{ event: "Cuti Akhir Persekolahan Tahun 2026", type: "cuti", color: "#f59e0b" }],
+            "2026-12-29": [{ event: "Mesyuarat Pengurusan, Mesyuarat Guru & Mesyuarat Kurikulum Bil. 1 2027", type: "sekolah", color: "#10b981" }],
+            "2026-12-30": [{ event: "Mesyuarat HEM & Ko-Kurikulum Bil. 1 2027", type: "sekolah", color: "#10b981" }],
+            "2026-12-31": [{ event: "Hari Orientasi Prasekolah & Tahun 1, 2027", type: "sekolah", color: "#10b981" }]
+        };
+
+        const categoryConfig = {
+            pentadbiran: { color: "#f59e0b", label: "Pentadbiran", icon: "⚡" },
+            kurikulum: { color: "#10b981", label: "Kurikulum", icon: "📚" },
+            hem: { color: "#3b82f6", label: "HEM", icon: "💙" },
+            kokurikulum: { color: "#8b5cf6", label: "Kokurikulum", icon: "🎯" }
+        };
+
+        const eventTypeConfig = {
+            cuti: { label: "Cuti", icon: "🔴", color: "#ef4444" },
+            sekolah: { label: "Aktiviti Sekolah", icon: "🟢", color: "#10b981" },
+            aktiviti: { label: "Program/Majlis", icon: "🟣", color: "#8b5cf6" },
+            peperiksaan: { label: "Peperiksaan", icon: "🔵", color: "#0ea5e9" },
+            kurikulum: { label: "Kurikulum", icon: "🟡", color: "#14b8a6" },
+            hem: { label: "HEM", icon: "🟠", color: "#f97316" },
+            kokurikulum: { label: "Kokurikulum", icon: "💗", color: "#ec4899" }
+        };
+
+        const MONTHS_MS = ["Januari", "Februari", "Mac", "April", "Mei", "Jun", "Julai", "Ogos", "September", "Oktober", "November", "Disember"];
+        const DAYS_MS = ["Ahd", "Isn", "Sel", "Rab", "Kha", "Jum", "Sab"];
+
+        const extractMainName = (fullName) => {
+            const parts = fullName.toUpperCase().split(' ');
+            const commonNames = ['SITI', 'NUR', 'NURUL', 'MUHAMMAD', 'AHMAD', 'ABU', 'ABDUL'];
+            const excludeWords = ['PN.', 'EN.', 'CIK', 'HJH.', 'HJ.', 'BINTI', 'BIN', 'B.', 'BT.', '@', 'ABD', 'MOHD', 'MOHAMED', 'MOHAMAD', 'DR.', 'DR', ...commonNames];
+            const filtered = parts.filter(part => !excludeWords.includes(part) && part.length > 2);
+            if (filtered.length > 0) return filtered[0];
+            for (let i = 1; i < parts.length; i++) {
+                if (parts[i].length > 2 && !['BINTI', 'BIN', 'B.', 'BT.', '@'].includes(parts[i])) return parts[i];
+            }
+            return parts[1] || '';
+        };
+
+        const ZOOM_LEVELS = [50, 75, 100, 125, 150, 200];
+
+        function App() {
+            const [activeTab, setActiveTab] = useState('buku');
+            const [currentPage, setCurrentPage] = useState(1);
+            const [totalPages, setTotalPages] = useState(CONFIG.jumlahMukaSurat);
+            const [pdfDoc, setPdfDoc] = useState(null);
+            const [isLoading, setIsLoading] = useState(true);
+            const [loadError, setLoadError] = useState(null);
+            const [showNav, setShowNav] = useState(false);
+            const [selectedGuru, setSelectedGuru] = useState(null);
+            const [showToast, setShowToast] = useState(false);
+            const [toastMsg, setToastMsg] = useState('');
+            const [highlightName, setHighlightName] = useState('');
+            const [pageHeight, setPageHeight] = useState(700);
+            const [renderedPages, setRenderedPages] = useState(new Set());
+            const [zoomLevel, setZoomLevel] = useState(100);
+            const [showZoomMenu, setShowZoomMenu] = useState(false);
+            const [searchQuery, setSearchQuery] = useState('');
+            const [searchResults, setSearchResults] = useState([]);
+            const [showSearchResults, setShowSearchResults] = useState(false);
+            const [activeFilter, setActiveFilter] = useState('semua');
+            const [calendarMonth, setCalendarMonth] = useState(new Date().getMonth());
+            const [calendarYear, setCalendarYear] = useState(parseInt(CONFIG.tahun));
+            const [selectedDate, setSelectedDate] = useState(null);
+            
+            const scrollContainerRef = useRef(null);
+            const canvasRefs = useRef({});
+            const pageRefs = useRef({});
+            const renderingRef = useRef(new Set());
+            const searchInputRef = useRef(null);
+
+            useEffect(() => { loadPDF(); }, []);
+
+            // SEARCH: Cari dalam guru, tugas, bahagian, dan takwim
+            useEffect(() => {
+                if (searchQuery.length < 2) {
+                    setSearchResults([]);
+                    setShowSearchResults(false);
+                    return;
+                }
+                const query = searchQuery.toUpperCase();
+                const results = [];
+                
+                // Cari guru
+                guruDatabase.forEach(guru => {
+                    if (guru.nama.toUpperCase().includes(query) || guru.jawatan.toUpperCase().includes(query)) {
+                        results.push({ type: 'guru', guru: guru, label: guru.nama, sublabel: guru.jawatan, page: guru.tugas[0]?.page_number || 1 });
+                    }
+                    guru.tugas.forEach(tugas => {
+                        if (tugas.label.toUpperCase().includes(query)) {
+                            results.push({ type: 'tugas', guru: guru, label: tugas.label, sublabel: guru.nama, page: tugas.page_number, category: tugas.category });
+                        }
+                    });
+                });
+                
+                // Cari dalam table of contents
+                tableOfContents.forEach(section => {
+                    if (section.label.toUpperCase().includes(query)) {
+                        results.push({ type: 'section', label: section.label, sublabel: `m/s ${section.page_start} - ${section.page_end}`, page: section.page_start, icon: section.icon });
+                    }
+                });
+                
+                // Cari dalam takwim/event
+                Object.entries(takwimData).forEach(([dateStr, events]) => {
+                    events.forEach(event => {
+                        if (event.event.toUpperCase().includes(query)) {
+                            const date = new Date(dateStr);
+                            const dayName = DAYS_MS[date.getDay()];
+                            const monthName = MONTHS_MS[date.getMonth()];
+                            results.push({ 
+                                type: 'takwim', 
+                                label: event.event, 
+                                sublabel: `${date.getDate()} ${monthName} ${date.getFullYear()} (${dayName})`,
+                                date: dateStr,
+                                eventType: event.type,
+                                color: event.color
+                            });
+                        }
+                    });
+                });
+                
+                setSearchResults(results.slice(0, 10));
+                setShowSearchResults(results.length > 0);
+            }, [searchQuery]);
+
+            const loadPDF = async () => {
+                setIsLoading(true);
+                try {
+                    const pdf = await pdfjsLib.getDocument(CONFIG.pdfFileName).promise;
+                    setPdfDoc(pdf);
+                    setTotalPages(pdf.numPages);
+                    const firstPage = await pdf.getPage(1);
+                    const container = scrollContainerRef.current;
+                    if (container) {
+                        const containerWidth = container.clientWidth - 24;
+                        const viewport = firstPage.getViewport({ scale: 1 });
+                        const scale = containerWidth / viewport.width;
+                        setPageHeight(Math.round(viewport.height * scale));
+                    }
+                    setIsLoading(false);
+                } catch (e) {
+                    console.error('PDF Load Error:', e);
+                    setLoadError('Gagal memuatkan PDF. Pastikan fail PDF ada dalam folder yang sama.');
+                    setIsLoading(false);
+                }
+            };
+
+            const renderPage = useCallback(async (pageNum, withHighlight = null) => {
+                if (!pdfDoc || !canvasRefs.current[pageNum]) return;
+                if (renderingRef.current.has(pageNum)) return;
+                renderingRef.current.add(pageNum);
+                try {
+                    const page = await pdfDoc.getPage(pageNum);
+                    const canvas = canvasRefs.current[pageNum];
+                    const container = scrollContainerRef.current;
+                    if (!canvas || !container) return;
+                    const pixelRatio = Math.min(window.devicePixelRatio || 1, 2);
+                    const containerWidth = container.clientWidth - 24;
+                    const baseScale = containerWidth / page.getViewport({ scale: 1 }).width;
+                    const zoomScale = zoomLevel / 100;
+                    const scale = baseScale * zoomScale;
+                    const viewport = page.getViewport({ scale: scale * pixelRatio });
+                    canvas.width = viewport.width;
+                    canvas.height = viewport.height;
+                    canvas.style.width = (viewport.width / pixelRatio) + 'px';
+                    canvas.style.height = (viewport.height / pixelRatio) + 'px';
+                    const ctx = canvas.getContext('2d');
+                    await page.render({ canvasContext: ctx, viewport }).promise;
+                    const nameToHighlight = withHighlight || highlightName;
+                    if (nameToHighlight) {
+                        const textContent = await page.getTextContent();
+                        const mainName = extractMainName(nameToHighlight);
+                        textContent.items.forEach((item) => {
+                            const itemText = item.str.toUpperCase().trim();
+                            if (mainName && itemText.includes(mainName) && itemText.length < 50) {
+                                const [a, b, c, d, e, f] = item.transform;
+                                const itemX = e * scale * pixelRatio;
+                                const itemY = canvas.height - (f * scale * pixelRatio) - (item.height * scale * pixelRatio * 0.8);
+                                const itemWidth = item.width * scale * pixelRatio;
+                                const itemHeight = item.height * scale * pixelRatio * 1.5;
+                                ctx.fillStyle = 'rgba(255, 220, 0, 0.6)';
+                                ctx.fillRect(itemX - 4, itemY - 4, itemWidth + 8, itemHeight + 8);
+                                ctx.strokeStyle = '#f59e0b';
+                                ctx.lineWidth = 3 * pixelRatio;
+                                ctx.strokeRect(itemX - 4, itemY - 4, itemWidth + 8, itemHeight + 8);
+                            }
+                        });
+                    }
+                    setRenderedPages(prev => new Set([...prev, pageNum]));
+                } catch (e) {
+                    console.error('Render error page', pageNum, e);
+                } finally {
+                    renderingRef.current.delete(pageNum);
+                }
+            }, [pdfDoc, highlightName, zoomLevel]);
+
+            useEffect(() => {
+                if (pdfDoc && scrollContainerRef.current) {
+                    setRenderedPages(new Set());
+                    renderingRef.current.clear();
+                    pdfDoc.getPage(1).then(firstPage => {
+                        const container = scrollContainerRef.current;
+                        if (container) {
+                            const containerWidth = container.clientWidth - 24;
+                            const viewport = firstPage.getViewport({ scale: 1 });
+                            const scale = (containerWidth / viewport.width) * (zoomLevel / 100);
+                            setPageHeight(Math.round(viewport.height * scale));
+                        }
+                        setTimeout(renderVisiblePages, 100);
+                    });
+                }
+            }, [zoomLevel]);
+
+            const renderVisiblePages = useCallback(() => {
+                if (!scrollContainerRef.current || !pdfDoc) return;
+                const container = scrollContainerRef.current;
+                const scrollTop = container.scrollTop;
+                const containerHeight = container.clientHeight;
+                const buffer = containerHeight;
+                const pageFullHeight = pageHeight + 12;
+                const startPage = Math.max(1, Math.floor((scrollTop - buffer) / pageFullHeight) + 1);
+                const endPage = Math.min(totalPages, Math.ceil((scrollTop + containerHeight + buffer) / pageFullHeight) + 1);
+                for (let i = startPage; i <= endPage; i++) {
+                    if (!renderedPages.has(i) && canvasRefs.current[i]) renderPage(i);
+                }
+                const currentP = Math.floor((scrollTop + containerHeight / 3) / pageFullHeight) + 1;
+                if (currentP !== currentPage && currentP >= 1 && currentP <= totalPages) setCurrentPage(currentP);
+            }, [pdfDoc, pageHeight, totalPages, currentPage, renderedPages, renderPage]);
+
+            useEffect(() => { if (pdfDoc && !isLoading) setTimeout(renderVisiblePages, 100); }, [pdfDoc, isLoading]);
+
+            const handleScroll = useCallback(() => { renderVisiblePages(); }, [renderVisiblePages]);
+
+            const scrollToPage = useCallback((pageNum) => {
+                if (!scrollContainerRef.current) return;
+                // Use pageRefs for more accurate scrolling
+                const targetPage = pageRefs.current[pageNum];
+                if (targetPage) {
+                    targetPage.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                } else {
+                    // Fallback to calculation
+                    const targetScroll = (pageNum - 1) * (pageHeight + 12);
+                    scrollContainerRef.current.scrollTo({ top: targetScroll, behavior: 'smooth' });
+                }
+                setCurrentPage(pageNum);
+            }, [pageHeight]);
+
+            const toast = (msg) => { setToastMsg(msg); setShowToast(true); setTimeout(() => setShowToast(false), 2500); };
+
+            const navigateToTask = async (guru, task) => {
+                const newHighlightName = guru.nama;
+                setHighlightName(newHighlightName);
+                setActiveTab('buku');
+                setSelectedGuru(null);
+                setSearchQuery('');
+                setShowSearchResults(false);
+                setTimeout(async () => {
+                    setRenderedPages(prev => { const newSet = new Set(prev); newSet.delete(task.page_number); return newSet; });
+                    renderingRef.current.delete(task.page_number);
+                    await renderPage(task.page_number, newHighlightName);
+                    scrollToPage(task.page_number);
+                }, 150);
+                toast(`Mencari "${extractMainName(guru.nama)}" di m/s ${task.page_number}`);
+            };
+
+            const handleSearchResultClick = (result) => {
+                setSearchQuery(''); setShowSearchResults(false);
+                if (result.type === 'guru') { setActiveTab('guru'); setSelectedGuru(result.guru); }
+                else if (result.type === 'tugas') { navigateToTask(result.guru, { page_number: result.page }); }
+                else if (result.type === 'section') { setActiveTab('buku'); scrollToPage(result.page); toast(result.label); }
+                else if (result.type === 'takwim') { 
+                    const date = new Date(result.date);
+                    setCalendarMonth(date.getMonth());
+                    setCalendarYear(date.getFullYear());
+                    setSelectedDate(result.date);
+                    setActiveTab('takwim');
+                    toast(`📅 ${result.label}`);
+                }
+            };
+
+            const clearHighlight = () => { setHighlightName(''); setRenderedPages(new Set()); setTimeout(renderVisiblePages, 100); };
+            const navigateToSection = (section) => { scrollToPage(section.page_start); setShowNav(false); toast(section.label); };
+            const zoomIn = () => { const i = ZOOM_LEVELS.indexOf(zoomLevel); if (i < ZOOM_LEVELS.length - 1) setZoomLevel(ZOOM_LEVELS[i + 1]); };
+            const zoomOut = () => { const i = ZOOM_LEVELS.indexOf(zoomLevel); if (i > 0) setZoomLevel(ZOOM_LEVELS[i - 1]); };
+            const getFilteredTugas = (tugas) => activeFilter === 'semua' ? tugas : tugas.filter(t => t.category === activeFilter);
+
+            const currentSection = tableOfContents.find(s => currentPage >= s.page_start && currentPage <= s.page_end);
+            const pageNumbers = useMemo(() => Array.from({ length: totalPages }, (_, i) => i + 1), [totalPages]);
+
+            // Calendar functions
+            const getDaysInMonth = (year, month) => new Date(year, month + 1, 0).getDate();
+            const getFirstDayOfMonth = (year, month) => new Date(year, month, 1).getDay();
+            
+            const generateCalendarDays = () => {
+                const daysInMonth = getDaysInMonth(calendarYear, calendarMonth);
+                const firstDay = getFirstDayOfMonth(calendarYear, calendarMonth);
+                const prevMonth = calendarMonth === 0 ? 11 : calendarMonth - 1;
+                const prevYear = calendarMonth === 0 ? calendarYear - 1 : calendarYear;
+                const daysInPrevMonth = getDaysInMonth(prevYear, prevMonth);
+                const days = [];
+                for (let i = firstDay - 1; i >= 0; i--) {
+                    days.push({ day: daysInPrevMonth - i, currentMonth: false, date: `${prevYear}-${String(prevMonth + 1).padStart(2, '0')}-${String(daysInPrevMonth - i).padStart(2, '0')}` });
+                }
+                for (let i = 1; i <= daysInMonth; i++) {
+                    days.push({ day: i, currentMonth: true, date: `${calendarYear}-${String(calendarMonth + 1).padStart(2, '0')}-${String(i).padStart(2, '0')}` });
+                }
+                const remainingDays = 42 - days.length;
+                const nextMonth = calendarMonth === 11 ? 0 : calendarMonth + 1;
+                const nextYear = calendarMonth === 11 ? calendarYear + 1 : calendarYear;
+                for (let i = 1; i <= remainingDays; i++) {
+                    days.push({ day: i, currentMonth: false, date: `${nextYear}-${String(nextMonth + 1).padStart(2, '0')}-${String(i).padStart(2, '0')}` });
+                }
+                return days;
+            };
+
+            const getEventsForDate = (dateStr) => takwimData[dateStr] || [];
+
+            return (
+                <div className="h-full flex flex-col bg-slate-200">
+                    {showToast && (
+                        <div className="fixed top-20 left-1/2 -translate-x-1/2 z-50 bg-green-600 text-white px-4 py-2 rounded-full text-sm shadow-lg animate-fadeIn">✓ {toastMsg}</div>
+                    )}
+
+                    {/* Header */}
+                    <div className="bg-gradient-to-r from-indigo-600 to-purple-600 text-white px-3 py-2 flex items-center justify-between flex-shrink-0 shadow-lg">
+                        <div className="flex items-center gap-2">
+                            <div className="w-10 h-10 bg-white/20 rounded-xl flex items-center justify-center text-xl">🏫</div>
+                            <div>
+                                <div className="font-bold text-sm leading-tight">{CONFIG.namaSekolahPendek}</div>
+                                <div className="text-white/70 text-xs">{CONFIG.namaSekolah} {CONFIG.tahun}</div>
+                            </div>
+                        </div>
+                        
+                        <div className="flex-1 max-w-xs mx-2 relative">
+                            <input ref={searchInputRef} type="text" value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)}
+                                onFocus={() => searchQuery.length >= 2 && setShowSearchResults(true)}
+                                placeholder="🔍 Cari nama/event..."
+                                className="w-full px-3 py-1.5 rounded-lg text-sm text-gray-800 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-white/50" />
+                            
+                            {showSearchResults && searchResults.length > 0 && (
+                                <div className="absolute top-full left-0 right-0 mt-1 bg-white rounded-xl shadow-2xl z-50 max-h-[60vh] overflow-y-auto animate-slideUp" style={{minWidth: '280px', left: '-20px', right: '-20px'}}>
+                                    {searchResults.map((result, i) => (
+                                        <button key={i} onClick={() => handleSearchResultClick(result)}
+                                            className="w-full text-left p-3 hover:bg-indigo-50 flex items-center gap-3 border-b border-gray-100 last:border-0">
+                                            <div className="w-8 h-8 rounded-lg flex items-center justify-center text-white text-sm flex-shrink-0"
+                                                style={{ backgroundColor: result.type === 'takwim' ? (result.color || '#8b5cf6') : result.type === 'section' ? '#6366f1' : (categoryConfig[result.category]?.color || '#8b5cf6') }}>
+                                                {result.type === 'guru' ? '👤' : result.type === 'section' ? result.icon : result.type === 'takwim' ? '📅' : '📋'}
+                                            </div>
+                                            <div className="flex-1 min-w-0 overflow-hidden">
+                                                <div className="font-medium text-gray-800 text-sm truncate" title={result.label}>{result.label}</div>
+                                                <div className="text-xs text-gray-500 truncate" title={result.sublabel}>
+                                                    {result.sublabel}
+                                                    {result.type !== 'takwim' && ` • m/s ${result.page}`}
+                                                </div>
+                                            </div>
+                                            {result.type === 'takwim' && (
+                                                <span className="text-xs px-2 py-1 rounded-full bg-indigo-100 text-indigo-600 font-medium flex-shrink-0">Takwim</span>
+                                            )}
+                                        </button>
+                                    ))}
+                                </div>
+                            )}
+                        </div>
+                        
+                        <div className="flex gap-1">
+                            <button onClick={() => setActiveTab('buku')} className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all ${activeTab === 'buku' ? 'bg-white text-indigo-600' : 'bg-white/20'}`}>📖</button>
+                            <button onClick={() => setActiveTab('guru')} className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all ${activeTab === 'guru' ? 'bg-white text-indigo-600' : 'bg-white/20'}`}>👥</button>
+                            <button onClick={() => setActiveTab('takwim')} className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all ${activeTab === 'takwim' ? 'bg-white text-indigo-600' : 'bg-white/20'}`}>📅</button>
+                        </div>
+                    </div>
+
+                    {/* BUKU TAB */}
+                    {activeTab === 'buku' && (
+                        <div className="flex-1 flex flex-col min-h-0">
+                            <div className="bg-white border-b border-slate-200 px-2 py-1.5 flex items-center justify-between gap-1 flex-shrink-0 shadow-sm">
+                                <button onClick={() => setShowNav(!showNav)} className="flex items-center gap-1 px-2 py-1 bg-slate-100 hover:bg-slate-200 rounded text-slate-700 text-xs font-medium">📑</button>
+                                
+                                <div className="flex items-center gap-1">
+                                    <button onClick={zoomOut} disabled={zoomLevel <= 50} className="w-7 h-7 flex items-center justify-center bg-slate-100 hover:bg-slate-200 rounded text-slate-600 disabled:opacity-40">➖</button>
+                                    <div className="relative">
+                                        <button onClick={() => setShowZoomMenu(!showZoomMenu)} className="px-2 py-1 bg-indigo-100 text-indigo-700 rounded text-xs font-medium min-w-[50px]">{zoomLevel}%</button>
+                                        {showZoomMenu && (
+                                            <div className="absolute top-full left-1/2 -translate-x-1/2 mt-1 bg-white rounded-lg shadow-xl z-50 py-1 min-w-[70px]">
+                                                {ZOOM_LEVELS.map(level => (
+                                                    <button key={level} onClick={() => { setZoomLevel(level); setShowZoomMenu(false); }}
+                                                        className={`w-full px-3 py-1.5 text-xs text-left hover:bg-indigo-50 ${level === zoomLevel ? 'bg-indigo-100 text-indigo-700 font-medium' : 'text-gray-700'}`}>
+                                                        {level}%
+                                                    </button>
+                                                ))}
+                                            </div>
+                                        )}
+                                    </div>
+                                    <button onClick={zoomIn} disabled={zoomLevel >= 200} className="w-7 h-7 flex items-center justify-center bg-slate-100 hover:bg-slate-200 rounded text-slate-600 disabled:opacity-40">➕</button>
+                                </div>
+                                
+                                <div className="text-xs text-slate-500">m/s {currentPage}/{totalPages}</div>
+                            </div>
+                            
+                            {currentSection && (
+                                <div className="bg-indigo-50 px-3 py-1.5 text-xs text-indigo-700 font-medium flex items-center gap-2 flex-shrink-0 border-b border-indigo-100">
+                                    <span>{currentSection.icon}</span>
+                                    <span className="truncate">{currentSection.label}</span>
+                                </div>
+                            )}
+
+                            {highlightName && (
+                                <div className="bg-amber-50 px-3 py-1.5 flex items-center justify-between flex-shrink-0 border-b border-amber-200">
+                                    <span className="text-xs text-amber-700">🔍 Highlighting: <strong>{extractMainName(highlightName)}</strong></span>
+                                    <button onClick={clearHighlight} className="text-xs bg-amber-200 hover:bg-amber-300 px-2 py-0.5 rounded text-amber-800">✕ Clear</button>
+                                </div>
+                            )}
+
+                            <div className="flex-1 flex min-h-0 relative">
+                                {showNav && (
+                                    <div className="absolute left-0 top-0 bottom-0 w-64 bg-white shadow-xl z-40 overflow-y-auto animate-slideUp">
+                                        <div className="p-3 border-b border-slate-200 flex justify-between items-center bg-gradient-to-r from-indigo-600 to-purple-600">
+                                            <span className="font-bold text-white text-sm">Isi Kandungan</span>
+                                            <button onClick={() => setShowNav(false)} className="text-white/80 hover:text-white text-lg">✕</button>
+                                        </div>
+                                        <div className="p-2">
+                                            {tableOfContents.map((section, i) => (
+                                                <button key={i} onClick={() => navigateToSection(section)}
+                                                    className={`w-full text-left p-2.5 rounded-lg mb-1 flex items-center gap-2 transition-all ${currentPage >= section.page_start && currentPage <= section.page_end ? 'bg-indigo-100 border-l-4 border-indigo-500' : 'hover:bg-slate-100'}`}>
+                                                    <span className="text-lg">{section.icon}</span>
+                                                    <div className="flex-1 min-w-0">
+                                                        <div className="text-xs font-medium text-slate-800 truncate">{section.label}</div>
+                                                        <div className="text-[10px] text-slate-500">m/s {section.page_start} - {section.page_end}</div>
+                                                    </div>
+                                                </button>
+                                            ))}
+                                        </div>
+                                    </div>
+                                )}
+
+                                <div ref={scrollContainerRef} onScroll={handleScroll} className="flex-1 overflow-y-auto pdf-scroll-container bg-slate-300 p-3">
+                                    {isLoading ? (
+                                        <div className="flex flex-col items-center justify-center h-full gap-3">
+                                            <div className="w-12 h-12 border-4 border-indigo-200 border-t-indigo-600 rounded-full animate-spin"></div>
+                                            <p className="text-slate-600 text-sm">Memuatkan PDF...</p>
+                                        </div>
+                                    ) : loadError ? (
+                                        <div className="flex flex-col items-center justify-center h-full gap-3 p-4">
+                                            <div className="text-4xl">⚠️</div>
+                                            <p className="text-red-600 text-sm text-center">{loadError}</p>
+                                        </div>
+                                    ) : (
+                                        <div className="flex flex-col items-center" style={{ minHeight: totalPages * (pageHeight + 12) }}>
+                                            {pageNumbers.map(pageNum => (
+                                                <div key={pageNum} ref={el => pageRefs.current[pageNum] = el}
+                                                    className="page-wrapper bg-white shadow-lg rounded overflow-hidden"
+                                                    style={{ width: zoomLevel > 100 ? `${zoomLevel}%` : '100%', maxWidth: zoomLevel > 100 ? 'none' : '100%' }}>
+                                                    <canvas ref={el => canvasRefs.current[pageNum] = el}
+                                                        className={`w-full ${!renderedPages.has(pageNum) ? 'bg-slate-100 animate-pulse' : ''}`}
+                                                        style={{ minHeight: !renderedPages.has(pageNum) ? pageHeight : 'auto' }} />
+                                                </div>
+                                            ))}
+                                        </div>
+                                    )}
+                                </div>
+                            </div>
+                        </div>
+                    )}
+
+                    {/* GURU TAB */}
+                    {activeTab === 'guru' && (
+                        <div className="flex-1 overflow-y-auto bg-slate-100 p-3">
+                            {!selectedGuru ? (
+                                <>
+                                    <div className="grid grid-cols-2 gap-2">
+                                        {guruDatabase.map((guru, i) => (
+                                            <button key={i} onClick={() => setSelectedGuru(guru)}
+                                                className="bg-white rounded-xl p-3 text-left shadow-sm hover:shadow-md transition-all border border-slate-200">
+                                                <div className="flex items-center gap-2 mb-2">
+                                                    <div className="w-10 h-10 rounded-full flex items-center justify-center text-xl"
+                                                        style={{ backgroundColor: categoryConfig[guru.tugas[0]?.category]?.color || '#8b5cf6' }}>
+                                                        {guru.avatar}
+                                                    </div>
+                                                </div>
+                                                <div className="text-xs font-semibold text-slate-800 truncate">{guru.nama.replace(/^(PN\.|EN\.|CIK|DR\.)\s*/i, '')}</div>
+                                                <div className="text-[10px] text-slate-500 truncate">{guru.jawatan}</div>
+                                            </button>
+                                        ))}
+                                    </div>
+                                </>
+                            ) : (
+                                <>
+                                    <button onClick={() => setSelectedGuru(null)} className="mb-3 flex items-center gap-1 text-indigo-600 text-sm font-medium">
+                                        ← Kembali
+                                    </button>
+                                    <div className="bg-gradient-to-r from-indigo-600 to-purple-600 rounded-xl p-4 text-white mb-3 shadow-lg">
+                                        <div className="flex items-center gap-3">
+                                            <div className="w-14 h-14 bg-white/20 rounded-full flex items-center justify-center text-3xl">{selectedGuru.avatar}</div>
+                                            <div>
+                                                <div className="font-bold">{selectedGuru.nama}</div>
+                                                <div className="text-white/80 text-sm">{selectedGuru.jawatan}</div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    
+                                    <div className="flex gap-1 overflow-x-auto pb-2 mb-3">
+                                        {['semua', 'pentadbiran', 'kurikulum', 'hem', 'kokurikulum'].map(filter => (
+                                            <button key={filter} onClick={() => setActiveFilter(filter)}
+                                                className={`px-3 py-1.5 rounded-full text-xs font-medium whitespace-nowrap transition-all ${activeFilter === filter ? 'text-white' : 'bg-white text-slate-600 border border-slate-200'}`}
+                                                style={activeFilter === filter ? { backgroundColor: filter === 'semua' ? '#6366f1' : categoryConfig[filter]?.color } : {}}>
+                                                {filter === 'semua' ? '📋 Semua' : `${categoryConfig[filter]?.icon} ${categoryConfig[filter]?.label}`}
+                                            </button>
+                                        ))}
+                                    </div>
+
+                                    <div className="space-y-2">
+                                        {getFilteredTugas(selectedGuru.tugas).map((task, i) => (
+                                            <button key={i} onClick={() => navigateToTask(selectedGuru, task)}
+                                                className="w-full bg-white rounded-xl p-3 flex items-center gap-3 shadow-sm hover:shadow-md transition-all border border-slate-200 text-left">
+                                                <div className="w-8 h-8 rounded-lg flex items-center justify-center text-white text-sm"
+                                                    style={{ backgroundColor: categoryConfig[task.category]?.color || '#8b5cf6' }}>
+                                                    {categoryConfig[task.category]?.icon || '📋'}
+                                                </div>
+                                                <div className="flex-1 min-w-0">
+                                                    <div className="text-sm font-medium text-slate-800 truncate">{task.label}</div>
+                                                    <div className="text-xs text-slate-500">Muka surat {task.page_number}</div>
+                                                </div>
+                                                <span className="text-slate-400">→</span>
+                                            </button>
+                                        ))}
+                                    </div>
+                                </>
+                            )}
+                        </div>
+                    )}
+
+                    {/* TAKWIM TAB */}
+                    {activeTab === 'takwim' && (
+                        <div className="flex-1 overflow-y-auto bg-slate-100 p-3">
+                            <div className="bg-white rounded-xl shadow-sm overflow-hidden">
+                                <div className="bg-gradient-to-r from-indigo-600 to-purple-600 p-3 flex items-center justify-between">
+                                    <button onClick={() => { if (calendarMonth === 0) { setCalendarMonth(11); setCalendarYear(calendarYear - 1); } else { setCalendarMonth(calendarMonth - 1); }}}
+                                        className="w-8 h-8 rounded-full bg-white/20 flex items-center justify-center text-white">←</button>
+                                    <div className="text-white font-bold">{MONTHS_MS[calendarMonth]} {calendarYear}</div>
+                                    <button onClick={() => { if (calendarMonth === 11) { setCalendarMonth(0); setCalendarYear(calendarYear + 1); } else { setCalendarMonth(calendarMonth + 1); }}}
+                                        className="w-8 h-8 rounded-full bg-white/20 flex items-center justify-center text-white">→</button>
+                                </div>
+                                
+                                <div className="grid grid-cols-7 border-b border-slate-200">
+                                    {DAYS_MS.map(day => (
+                                        <div key={day} className="py-2 text-center text-xs font-medium text-slate-500">{day}</div>
+                                    ))}
+                                </div>
+                                
+                                <div className="grid grid-cols-7">
+                                    {generateCalendarDays().map((dayObj, i) => {
+                                        const events = getEventsForDate(dayObj.date);
+                                        const isSelected = selectedDate === dayObj.date;
+                                        return (
+                                            <button key={i} onClick={() => events.length > 0 && setSelectedDate(dayObj.date)}
+                                                className={`aspect-square p-1 border-b border-r border-slate-100 flex flex-col items-center justify-start relative ${!dayObj.currentMonth ? 'bg-slate-50' : ''} ${isSelected ? 'bg-indigo-100' : ''} ${events.length > 0 ? 'cursor-pointer hover:bg-slate-50' : ''}`}>
+                                                <span className={`text-xs ${!dayObj.currentMonth ? 'text-slate-300' : 'text-slate-700'} ${isSelected ? 'font-bold text-indigo-700' : ''}`}>
+                                                    {dayObj.day}
+                                                </span>
+                                                {events.length > 0 && (
+                                                    <div className="flex gap-0.5 mt-0.5 flex-wrap justify-center">
+                                                        {events.slice(0, 3).map((event, j) => (
+                                                            <div key={j} className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: event.color }}></div>
+                                                        ))}
+                                                    </div>
+                                                )}
+                                            </button>
+                                        );
+                                    })}
+                                </div>
+                            </div>
+
+                            {selectedDate && getEventsForDate(selectedDate).length > 0 && (
+                                <div className="mt-3 bg-white rounded-xl p-3 shadow-sm animate-slideUp">
+                                    <div className="flex items-center justify-between mb-2">
+                                        <div className="font-bold text-slate-800 text-sm">
+                                            {DAYS_MS[new Date(selectedDate).getDay()]}, {new Date(selectedDate).getDate()} {MONTHS_MS[new Date(selectedDate).getMonth()]} {new Date(selectedDate).getFullYear()}
+                                        </div>
+                                        <button onClick={() => setSelectedDate(null)} className="text-slate-400 hover:text-slate-600">✕</button>
+                                    </div>
+                                    <div className="space-y-2">
+                                        {getEventsForDate(selectedDate).map((event, i) => (
+                                            <div key={i} className="flex items-center gap-2 p-2 rounded-lg bg-slate-50">
+                                                <div className="w-2.5 h-2.5 rounded-full flex-shrink-0" style={{ backgroundColor: event.color }}></div>
+                                                <span className="text-sm text-slate-700">{event.event}</span>
+                                            </div>
+                                        ))}
+                                    </div>
+                                </div>
+                            )}
+
+                            <div className="mt-3 bg-white rounded-xl p-3 shadow-sm">
+                                <div className="text-xs font-medium text-slate-500 mb-2">Petunjuk:</div>
+                                <div className="grid grid-cols-2 gap-2">
+                                    {Object.entries(eventTypeConfig).map(([key, config]) => (
+                                        <div key={key} className="flex items-center gap-2">
+                                            <div className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: config.color }}></div>
+                                            <span className="text-xs text-slate-600">{config.label}</span>
+                                        </div>
+                                    ))}
+                                </div>
+                            </div>
+                        </div>
+                    )}
+                </div>
+            );
+        }
+
+        ReactDOM.createRoot(document.getElementById('root')).render(<App />);
+    </script>
+</body>
+</html>
